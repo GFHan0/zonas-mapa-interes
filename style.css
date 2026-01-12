@@ -1,34 +1,18 @@
-/* --- Estilos Generales --- */
+/* =========================================
+   1. ESTILOS GENERALES Y ESTRUCTURA
+   ========================================= */
 body {
     margin: 0;
     font-family: 'Arial', sans-serif;
+    overflow: hidden; /* Evita scrolls innecesarios */
 }
 
-/* --- Configuración del Mapa --- */
 #map {
     height: 75vh; /* 75% de la pantalla para el mapa */
     width: 100%;
+    background-color: #eee;
 }
 
-/* --- PERSONALIZACIÓN DEL CURSOR (Estilo Uber/InDrive) --- */
-
-/* 1. ESTADO NORMAL: Muestra la "paleta" (puntero personalizado) */
-#map, 
-.leaflet-container, 
-.leaflet-grab, 
-.leaflet-interactive {
-    /* Usamos la imagen de la paleta. 16 32 coloca la punta del clic en la base del palito */
-    cursor: url('https://cdn-icons-png.flaticon.com/32/149/149060.png') 16 32, auto !important;
-}
-
-/* 2. ESTADO ARRASTRANDO: Muestra la manito cerrada al mover el mapa */
-.leaflet-dragging .leaflet-grab,
-.leaflet-dragging .leaflet-grab .leaflet-interactive,
-.leaflet-grab:active {
-    cursor: grabbing !important;
-}
-
-/* --- Panel de Información Inferior --- */
 .panel-info {
     height: 25vh; /* 25% para la información */
     background: #1a1a1a;
@@ -39,7 +23,6 @@ body {
     border-top: 4px solid #27ae60;
 }
 
-/* --- Botón de Envío --- */
 .btn-enviar {
     background: #27ae60;
     color: white;
@@ -48,4 +31,62 @@ body {
     border-radius: 8px;
     font-weight: bold;
     cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-enviar:hover {
+    background: #2ecc71;
+}
+
+/* =========================================
+   2. CURSOR PERSONALIZADO 
+   ========================================= */
+
+/* Estado Normal: El puntero negro tipo "chincheta" */
+/* El hotspot está en 16 32 (la base del palito) */
+#map, .leaflet-container {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="10" r="6" fill="black"/><line x1="16" y1="16" x2="16" y2="32" stroke="black" stroke-width="2"/></svg>') 16 32, auto !important;
+}
+
+/* Estado al pasar sobre botones o marcadores clicables */
+.leaflet-interactive, .btn-enviar, a {
+    cursor: pointer !important;
+}
+
+/* Estado ARRASTRANDO: Cambia a la manito cerrada del sistema */
+.leaflet-grab:active, 
+.leaflet-dragging .leaflet-container,
+.leaflet-dragging .leaflet-grab {
+    cursor: grabbing !important;
+}
+
+/* =========================================
+   3. PANTALLA DE CARGA (LOADING SPINNER)
+   ========================================= */
+#loader-overlay {
+    display: none; /* Se activa desde el script.js */
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #333;
+    border-top: 5px solid #27ae60; /* Verde calistenia */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
