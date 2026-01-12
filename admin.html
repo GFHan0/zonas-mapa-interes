@@ -14,18 +14,28 @@
         .btn-aprobar { background: #27ae60; }
         .btn-rechazar { background: #e67e22; }
         .btn-eliminar { background: #c0392b; }
-        .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; text-transform: uppercase; }
         .pendiente { background: #f1c40f; color: black; }
         .aprobado { background: #27ae60; }
         .rechazado { background: #e67e22; }
-        img { border-radius: 4px; transition: 0.3s; }
-        img:hover { transform: scale(3); position: relative; z-index: 10; }
+        img { border-radius: 4px; transition: 0.3s; cursor: zoom-in; }
+        img:hover { transform: scale(4); position: relative; z-index: 10; border: 2px solid white; }
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; z-index: 100; }
     </style>
 </head>
 <body>
 
+<div id="login" class="login-overlay">
+    <div style="text-align: center;">
+        <h2>Acceso Restringido</h2>
+        <input type="password" id="pass" placeholder="Contraseña de Admin" style="padding: 10px; border-radius: 5px; border: none;">
+        <button class="btn btn-aprobar" onclick="verificar()">Entrar</button>
+    </div>
+</div>
+
 <div class="container">
     <h1>Validación de Patrocinios</h1>
+    <p>Pasa el ratón sobre la foto para ampliarla.</p>
     <table>
         <thead>
             <tr>
@@ -44,19 +54,40 @@
     const SUPABASE_KEY = 'sb_publishable_8QmGDNmTJSCnnQT22-SSBA_9UFzR0YN';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    function verificar() {
+        const p = document.getElementById('pass').value;
+        if (p === "ADMIN2026") { 
+            document.getElementById('login').style.display = 'none';
+            cargarReporte();
+        } else {
+            alert("Clave incorrecta");
+        }
+    }
+
     async function cargarReporte() {
-        const { data } = await _supabase.from('puntos').select('*').order('creado_en', { ascending: false });
+        const { data, error } = await _supabase
+            .from('puntos')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            console.error("Error:", error.message);
+            return;
+        }
+
         const tbody = document.getElementById('tabla-puntos');
         tbody.innerHTML = "";
 
         if (data) {
             data.forEach(p => {
-                const foto = p.foto_url ? `<img src="${p.foto_url}" width="60" title="Pasa el mouse para ampliar">` : 'Sin foto';
+                const foto = p.foto_url ? `<img src="${p.foto_url}" width="60" title="Ampliar">` : '<i>Sin foto</i>';
+                // Usando el nombre correcto de tu columna: mensaje_admin
+                const motivo = p.mensaje_admin ? `<br><small style="color:#aaa;">Motivo: ${p.mensaje_admin}</small>` : '';
                 
                 tbody.innerHTML += `
                     <tr>
                         <td>${foto}</td>
-                        <td><b>${p.nombre_patrocinador}</b></td>
+                        <td><b>${p.nombre_patrocinador}</b>${motivo}</td>
                         <td><span class="badge ${p.estado}">${p.estado}</span></td>
                         <td>
                             ${p.estado === 'pendiente' ? `<button class="btn btn-aprobar" onclick="actualizar(${p.id}, 'aprobado')">Aprobar ✅</button>` : ''}
@@ -70,26 +101,32 @@
     }
 
     async function actualizar(id, nuevoEstado) {
-        await _supabase.from('puntos').update({ estado: nuevoEstado }).eq('id', id);
+        const { error } = await _supabase.from('puntos').update({ estado: nuevoEstado }).eq('id', id);
+        if (error) alert(error.message);
         cargarReporte();
     }
 
     async function rechazar(id) {
-        const motivo = prompt("¿Por qué rechazas este punto? (Se guardará en mensaje_admin)");
+        const motivo = prompt("¿Por qué rechazas este punto?");
         if (!motivo) return;
-        // Guardar motivo en la columna mensaje_admin
-        await _supabase.from('puntos').update({ estado: 'rechazado', mensaje_admin: motivo }).eq('id', id);
+        
+        // Actualizamos usando mensaje_admin
+        const { error } = await _supabase
+            .from('puntos')
+            .update({ estado: 'rechazado', mensaje_admin: motivo }) 
+            .eq('id', id);
+            
+        if (error) alert(error.message);
         cargarReporte();
     }
 
     async function eliminar(id) {
-        if (confirm("¿Seguro que quieres borrar este registro de la base de datos?")) {
-            await _supabase.from('puntos').delete().eq('id', id);
+        if (confirm("¿Seguro que quieres borrar este registro?")) {
+            const { error } = await _supabase.from('puntos').delete().eq('id', id);
+            if (error) alert(error.message);
             cargarReporte();
         }
     }
-
-    cargarReporte();
 </script>
 </body>
 </html>
