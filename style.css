@@ -1,0 +1,29 @@
+body {
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+}
+
+#map {
+    height: 75vh; /* 75% de la pantalla para el mapa */
+    width: 100%;
+}
+
+.panel-info {
+    height: 25vh; /* 25% para la información */
+    background: #1a1a1a;
+    color: white;
+    padding: 15px;
+    box-sizing: border-box;
+    text-align: center;
+    border-top: 4px solid #27ae60;
+}
+
+.btn-enviar {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
