@@ -1,13 +1,34 @@
+/* --- Estilos Generales --- */
 body {
     margin: 0;
     font-family: 'Arial', sans-serif;
 }
 
+/* --- Configuración del Mapa --- */
 #map {
     height: 75vh; /* 75% de la pantalla para el mapa */
     width: 100%;
 }
 
+/* --- PERSONALIZACIÓN DEL CURSOR (Estilo Uber/InDrive) --- */
+
+/* 1. ESTADO NORMAL: Muestra la "paleta" (puntero personalizado) */
+#map, 
+.leaflet-container, 
+.leaflet-grab, 
+.leaflet-interactive {
+    /* Usamos la imagen de la paleta. 16 32 coloca la punta del clic en la base del palito */
+    cursor: url('https://cdn-icons-png.flaticon.com/32/149/149060.png') 16 32, auto !important;
+}
+
+/* 2. ESTADO ARRASTRANDO: Muestra la manito cerrada al mover el mapa */
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-grab:active {
+    cursor: grabbing !important;
+}
+
+/* --- Panel de Información Inferior --- */
 .panel-info {
     height: 25vh; /* 25% para la información */
     background: #1a1a1a;
@@ -18,6 +39,7 @@ body {
     border-top: 4px solid #27ae60;
 }
 
+/* --- Botón de Envío --- */
 .btn-enviar {
     background: #27ae60;
     color: white;
