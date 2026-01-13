@@ -162,10 +162,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            try {
-                btnEnviar.disabled = true;
-                btnEnviar.textContent = 'Procesando...';
+            // Guardar datos antes de cerrar el modal
+            const descripcion = document.getElementById('descripcion').value;
+            const persona = document.getElementById('persona').value;
 
+            // Cerrar modal del formulario INMEDIATAMENTE
+            cerrarModal();
+            
+            // Mostrar modal de carga INMEDIATAMENTE
+            mostrarCarga();
+
+            try {
                 const imagenComprimida = await comprimirImagen(archivo);
                 const urlFinal = await subirFoto(imagenComprimida);
 
@@ -173,39 +180,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     const { error: insertError } = await _supabase.from('puntos').insert([{
                         latitud: ubicacionActual.lat,
                         longitud: ubicacionActual.lng,
-                        nombre_persona: document.getElementById('persona').value,
-                        nombre_patrocinador: document.getElementById('persona').value,
-                        descripcion: document.getElementById('descripcion').value,
+                        nombre_persona: persona,
+                        nombre_patrocinador: persona,
+                        descripcion: descripcion,
                         tipo_anuncio: document.getElementById('tipoAnuncio').value,
                         estado: 'pendiente',
                         foto_url: urlFinal
                     }]);
 
                     if (!insertError) {
-                        // Agregar marcador semitransparente al mapa
-                        const descripcion = document.getElementById('descripcion').value;
-                        const persona = document.getElementById('persona').value;
-                        
-                        agregarMarcadorPendiente(
-                            ubicacionActual.lat,
-                            ubicacionActual.lng,
-                            descripcion,
-                            persona,
-                            urlFinal
-                        );
-                        
-                        // Mostrar modal de éxito
-                        mostrarExito();
-                        
-                        // Cerrar modal del formulario después de 1.2 segundos
+                        // Cambiar a check después de 1 segundo
                         setTimeout(() => {
-                            cerrarModal();
-                        }, 1200);
+                            mostrarCheck();
+                        }, 1000);
+                        
+                        // Cerrar modal y agregar marcador después de 2.5 segundos
+                        setTimeout(() => {
+                            cerrarModalExito();
+                            
+                            // Agregar marcador semitransparente al mapa
+                            agregarMarcadorPendiente(
+                                ubicacionActual.lat,
+                                ubicacionActual.lng,
+                                descripcion,
+                                persona,
+                                urlFinal
+                            );
+                        }, 2500);
                     } else {
+                        cerrarModalExito();
                         alert('❌ Error: ' + insertError.message);
                     }
                 }
             } catch (err) {
+                cerrarModalExito();
                 alert("❌ Error: " + err.message);
             } finally {
                 btnEnviar.disabled = false;
@@ -220,27 +228,30 @@ function cambiarImagen() {
     document.getElementById('foto').click();
 }
 
-// Función para mostrar el modal de éxito
-function mostrarExito() {
+// Función para mostrar el modal de carga (solo spinner)
+function mostrarCarga() {
     const modalExito = document.getElementById('modal-exito');
     const spinnerCarga = document.getElementById('spinner-carga');
     const checkExito = document.getElementById('check-exito');
     
-    // Mostrar modal
     modalExito.style.display = 'flex';
     spinnerCarga.style.display = 'block';
     checkExito.style.display = 'none';
+}
+
+// Función para mostrar el check (reemplaza el spinner)
+function mostrarCheck() {
+    const spinnerCarga = document.getElementById('spinner-carga');
+    const checkExito = document.getElementById('check-exito');
     
-    // Cambiar a check después de 0.8 segundos
-    setTimeout(() => {
-        spinnerCarga.style.display = 'none';
-        checkExito.style.display = 'block';
-    }, 800);
-    
-    // Cerrar modal después de 2 segundos totales
-    setTimeout(() => {
-        modalExito.style.display = 'none';
-    }, 2000);
+    spinnerCarga.style.display = 'none';
+    checkExito.style.display = 'block';
+}
+
+// Función para cerrar el modal de éxito
+function cerrarModalExito() {
+    const modalExito = document.getElementById('modal-exito');
+    modalExito.style.display = 'none';
 }
 
 // Guardar ubicación y datos del último registro para el preview
