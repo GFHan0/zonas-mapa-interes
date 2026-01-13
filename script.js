@@ -115,21 +115,30 @@ async function subirFoto(archivoOptimizado, nombreOriginal) {
 // 5. Capturar clic en el mapa con el puntero personalizado
 let ubicacionActual = null;
 
-map.on('click', async function(e) {
+map.on('click', function(e) {
     const { lat, lng } = e.latlng;
     ubicacionActual = { lat, lng };
+    console.log("Ubicación capturada:", ubicacionActual);
     
     // Mostrar el modal
-    document.getElementById('modal-formulario').style.display = 'flex';
-    document.getElementById('formulario-zona').reset();
-    document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
+    const modal = document.getElementById('modal-formulario');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('formulario-zona').reset();
+        document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
+    }
 });
 
-// Manejo del input de archivo
-document.getElementById('foto').addEventListener('change', function(e) {
-    const archivo = e.target.files[0];
-    if (archivo) {
-        document.getElementById('nombre-archivo').textContent = `✓ ${archivo.name}`;
+// Manejo del input de archivo - Esperar a que el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    const fotoInput = document.getElementById('foto');
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (archivo) {
+                document.getElementById('nombre-archivo').textContent = `✓ ${archivo.name}`;
+            }
+        });
     }
 });
 
@@ -141,79 +150,87 @@ function cerrarModal() {
     ubicacionActual = null;
 }
 
-// Manejo del formulario
-document.getElementById('formulario-zona').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    if (!ubicacionActual) {
-        alert('Error: No hay ubicación seleccionada');
-        return;
-    }
-    
-    const descripcion = document.getElementById('descripcion').value;
-    const tipoAnuncio = document.getElementById('tipoAnuncio').value;
-    const materialAnuncio = document.getElementById('materialAnuncio').value;
-    const persona = document.getElementById('persona').value;
-    const archivo = document.getElementById('foto').files[0];
-    
-    if (!archivo) {
-        alert('Por favor selecciona una imagen');
-        return;
-    }
-    
-    // Deshabilitar el botón de envío
-    const btnEnviar = document.querySelector('.btn-confirmar');
-    btnEnviar.disabled = true;
-    btnEnviar.textContent = 'Enviando...';
-    
-    try {
-        alert("Optimizando imagen...");
-        const imagenParaSubir = await comprimirImagen(archivo);
-        
-        alert("Subiendo a la nube...");
-        const urlFoto = await subirFoto(imagenParaSubir, archivo.name);
-        
-        if (urlFoto) {
-            const { error: insertError } = await _supabase.from('puntos').insert([
-                {
-                    latitud: ubicacionActual.lat,
-                    longitud: ubicacionActual.lng,
-                    nombre_patrocinador: persona,
-                    descripcion: descripcion,
-                    tipo_anuncio: tipoAnuncio,
-                    material_anuncio: materialAnuncio,
-                    estado: 'pendiente',
-                    foto_url: urlFoto 
-                }
-            ]);
-
-            if (!insertError) {
-                alert("¡Zona registrada! Esperando validación del administrador.");
-                cerrarModal();
-                
-                // Mostrar marcador temporal en el mapa con transparencia
-                const fotoHtml = `<img src="${urlFoto}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">`;
-                const marcador = L.marker([ubicacionActual.lat, ubicacionActual.lng], {
-                    opacity: 0.6 // Hacer el marcador semitransparente
-                })
-                    .addTo(map)
-                    .bindPopup(`
-                        <div style="text-align:center; opacity:0.8;">
-                            <b style="font-size:1.1em; color:#f39c12;">⏳ Esperando Validación</b><br>
-                            <small style="color:#666;">${persona}</small><br>
-                            ${fotoHtml}
-                            <span style="color:#f39c12; font-weight:bold; font-size:0.9em;">En revisión</span>
-                        </div>
-                    `);
-            } else {
-                alert("Error: " + insertError.message);
+// Manejo del formulario - Esperar a que el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formulario-zona');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!ubicacionActual) {
+                alert('⚠️ Debes hacer clic en el mapa primero para seleccionar una ubicación');
+                return;
             }
-        }
-    } catch (error) {
-        alert("Error al procesar el registro: " + error.message);
-    } finally {
-        btnEnviar.disabled = false;
-        btnEnviar.textContent = 'Enviar Registro';
+            
+            const descripcion = document.getElementById('descripcion').value;
+            const tipoAnuncio = document.getElementById('tipoAnuncio').value;
+            const persona = document.getElementById('persona').value;
+            const archivo = document.getElementById('foto').files[0];
+            
+            if (!archivo) {
+                alert('⚠️ Por favor selecciona una imagen');
+                return;
+            }
+            
+            // Deshabilitar el botón de envío
+            const btnEnviar = document.querySelector('.btn-confirmar');
+            btnEnviar.disabled = true;
+            btnEnviar.textContent = 'Enviando...';
+            
+            try {
+                alert("Optimizando imagen...");
+                const imagenParaSubir = await comprimirImagen(archivo);
+                
+                alert("Subiendo a la nube...");
+                const urlFoto = await subirFoto(imagenParaSubir, archivo.name);
+                
+                if (urlFoto) {
+                    const { data: insertData, error: insertError } = await _supabase.from('puntos').insert([
+                        {
+                            latitud: ubicacionActual.lat,
+                            longitud: ubicacionActual.lng,
+                            nombre_persona: persona,
+                            nombre_patrocinador: persona,
+                            descripcion: descripcion,
+                            tipo_anuncio: tipoAnuncio,
+                            estado: 'pendiente',
+                            foto_url: urlFoto 
+                        }
+                    ]).select();
+
+                    if (!insertError) {
+                        alert("✅ ¡Zona registrada! Esperando validación del administrador.");
+                        cerrarModal();
+                        
+                        // Mostrar marcador temporal en el mapa con transparencia
+                        const fotoHtml = `<img src="${urlFoto}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">`;
+                        const marcador = L.marker([ubicacionActual.lat, ubicacionActual.lng], {
+                            opacity: 0.6 // Hacer el marcador semitransparente
+                        })
+                            .addTo(map)
+                            .bindPopup(`
+                                <div style="text-align:center; opacity:0.8;">
+                                    <b style="font-size:1.1em; color:#f39c12;">⏳ Esperando Validación</b><br>
+                                    <small style="color:#666;">${persona}</small><br>
+                                    ${fotoHtml}
+                                    <span style="color:#f39c12; font-weight:bold; font-size:0.9em;">En revisión</span>
+                                </div>
+                            `);
+                    } else {
+                        console.error("Error de inserción:", insertError);
+                        alert("❌ Error: " + insertError.message);
+                    }
+                } else {
+                    alert("❌ Error al subir la imagen");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("❌ Error al procesar el registro: " + error.message);
+            } finally {
+                btnEnviar.disabled = false;
+                btnEnviar.textContent = 'Enviar Registro';
+            }
+        });
     }
 });
 
