@@ -71,6 +71,14 @@ map.on('click', function(e) {
     }
 });
 
+// Evitar que se abra el modal sin ubicación al hacer clic en otros elementos
+document.addEventListener('click', function(e) {
+    // Evitar abrir modal si no hay ubicación
+    if (!ubicacionActual && e.target.id === 'modal-formulario') {
+        e.target.style.display = 'none';
+    }
+});
+
 // Cerrar Modal - Función global
 function cerrarModal() {
     const modal = document.getElementById('modal-formulario');
@@ -79,7 +87,7 @@ function cerrarModal() {
     }
     document.getElementById('formulario-zona').reset();
     document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
-    ubicacionActual = null;
+    // NO borrar ubicacionActual aquí - se borra solo cuando se hace clic en otro punto del mapa
 }
 
 // Cerrar modal cuando se presiona Escape
@@ -149,8 +157,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             
             // VERIFICACIÓN DE SEGURIDAD PARA EVITAR EL ERROR DE NULL
-            if (!ubicacionActual || ubicacionActual.lat === undefined) {
-                alert('❌ Error: No se detectó la ubicación. Haz clic de nuevo en el mapa.');
+            if (!ubicacionActual || !ubicacionActual.lat || !ubicacionActual.lng) {
+                alert('❌ Error: No se detectó la ubicación.\n\nPor favor:\n1. Cierra esta ventana\n2. Haz clic exacto en el mapa donde desees registrar la zona\n3. Vuelve a llenar el formulario');
                 return;
             }
 
