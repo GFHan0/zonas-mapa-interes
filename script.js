@@ -1,4 +1,4 @@
-// 1. Configuración de Supabase
+/ 1. Configuración de Supabase
 const SUPABASE_URL = 'https://jwtruolnvepievxheuyh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8QmGDNmTJSCnnQT22-SSBA_9UFzR0YN';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -71,6 +71,24 @@ map.on('click', function(e) {
     }
 });
 
+// Cerrar Modal - Función global
+function cerrarModal() {
+    const modal = document.getElementById('modal-formulario');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    document.getElementById('formulario-zona').reset();
+    document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
+    ubicacionActual = null;
+}
+
+// Cerrar modal cuando se presiona Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModal();
+    }
+})
+
 // 4. Cargar Puntos Aprobados
 async function cargarPuntosAprobados() {
     const { data, error } = await _supabase.from('puntos').select('*');
@@ -97,6 +115,26 @@ async function subirFoto(archivoOptimizado) {
 
 // 6. Manejo del Formulario (DOMContentLoaded para asegurar que existan los IDs)
 document.addEventListener('DOMContentLoaded', function() {
+    // Manejador del input de archivo
+    const fotoInput = document.getElementById('foto');
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            const nombreArchivSpan = document.getElementById('nombre-archivo');
+            
+            if (archivo) {
+                nombreArchivSpan.innerHTML = `
+                    <span style="color: #27ae60; font-weight: bold;">✓ ${archivo.name}</span>
+                    <br>
+                    <small style="color: #999; margin-top: 5px; display: block;">${(archivo.size / 1024).toFixed(2)} KB</small>
+                    <button type="button" style="margin-top: 10px; padding: 5px 10px; background: #e67e22; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;" onclick="cambiarImagen()">Cambiar imagen</button>
+                `;
+            } else {
+                nombreArchivSpan.textContent = 'Ningún archivo seleccionado';
+            }
+        });
+    }
+
     const form = document.getElementById('formulario-zona');
     if (form) {
         form.addEventListener('submit', async function(e) {
@@ -111,7 +149,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const btnEnviar = document.querySelector('.btn-confirmar');
             const archivo = document.getElementById('foto').files[0];
             
-            if (!archivo) { alert('Selecciona una foto'); return; }
+            if (!archivo) { 
+                alert('⚠️ Selecciona una foto');
+                return;
+            }
 
             try {
                 btnEnviar.disabled = true;
@@ -125,6 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         latitud: ubicacionActual.lat,
                         longitud: ubicacionActual.lng,
                         nombre_persona: document.getElementById('persona').value,
+                        nombre_patrocinador: document.getElementById('persona').value,
                         descripcion: document.getElementById('descripcion').value,
                         tipo_anuncio: document.getElementById('tipoAnuncio').value,
                         estado: 'pendiente',
@@ -133,11 +175,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     if (!insertError) {
                         alert("✅ ¡Enviado con éxito!");
+                        cerrarModal();
                         location.reload(); // Recarga para limpiar
+                    } else {
+                        alert('❌ Error: ' + insertError.message);
                     }
                 }
             } catch (err) {
-                alert("Error: " + err.message);
+                alert("❌ Error: " + err.message);
             } finally {
                 btnEnviar.disabled = false;
                 btnEnviar.textContent = 'Enviar Registro';
@@ -145,5 +190,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Función para cambiar la imagen seleccionada
+function cambiarImagen() {
+    document.getElementById('foto').click();
+}
 
 cargarPuntosAprobados();
