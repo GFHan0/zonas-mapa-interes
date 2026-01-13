@@ -9,6 +9,20 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
+// --- NUEVO: INTEGRACIÓN DEL BUSCADOR (GEOCODER) ---
+// Se coloca aquí para que aparezca desde el inicio
+const geocoder = L.Control.geocoder({
+    defaultMarkGeocode: false,
+    placeholder: "Busca una calle o lugar...",
+    errorMessage: "No se encontró el lugar."
+})
+.on('markgeocode', function(e) {
+    const latlng = e.geocode.center;
+    map.setView(latlng, 17); // Hace zoom al lugar encontrado
+    alert("¡Lugar encontrado! Ahora usa tu puntero para marcar la ubicación exacta.");
+})
+.addTo(map);
+
 // --- NUEVA FUNCIÓN DE COMPRESIÓN TÉCNICA ---
 async function comprimirImagen(archivo) {
     return new Promise((resolve) => {
@@ -19,7 +33,7 @@ async function comprimirImagen(archivo) {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1000; // Calidad ideal para visualización web/móvil
+                const MAX_WIDTH = 1000; 
                 let width = img.width;
                 let height = img.height;
 
@@ -33,7 +47,6 @@ async function comprimirImagen(archivo) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Convertimos a Blob (formato JPEG al 70% de calidad)
                 canvas.toBlob((blob) => {
                     resolve(blob);
                 }, 'image/jpeg', 0.7); 
@@ -64,7 +77,7 @@ async function cargarPuntosAprobados() {
                         <div style="text-align:center;">
                             <b style="font-size:1.1em;">${p.nombre_patrocinador}</b><br>
                             ${fotoHtml}
-                            <span style="color:blue; font-weight:bold;">Punto de importancia</span>
+                            <span style="color:blue; font-weight:bold;">Zona de Calistenia</span>
                         </div>
                     `);
             }
@@ -74,7 +87,6 @@ async function cargarPuntosAprobados() {
 
 // 4. Función para subir la imagen a Supabase Storage
 async function subirFoto(archivoOptimizado, nombreOriginal) {
-    // Generamos un nombre único para el archivo comprimido
     const nombreArchivo = `${Date.now()}_comprimido.jpg`;
     
     const { data, error } = await _supabase.storage
@@ -92,7 +104,7 @@ async function subirFoto(archivoOptimizado, nombreOriginal) {
     return urlData.publicUrl;
 }
 
-// 5. Capturar clic en el mapa
+// 5. Capturar clic en el mapa con el puntero personalizado
 map.on('click', async function(e) {
     const { lat, lng } = e.latlng;
     const nombre = prompt("¿Descripción de esta Zona de Interés?");
@@ -106,9 +118,7 @@ map.on('click', async function(e) {
     input.onchange = async () => {
         const file = input.files[0];
         if (file) {
-            alert("Optimizando imagen para ahorrar espacio...");
-            
-            // Comprimimos antes de subir
+            alert("Optimizando imagen...");
             const imagenParaSubir = await comprimirImagen(file);
             
             alert("Subiendo a la nube...");
@@ -126,9 +136,9 @@ map.on('click', async function(e) {
                 ]);
 
                 if (!insertError) {
-                    alert("¡Zona registrada! Aparecerá tras la validación del administrador.");
+                    alert("¡Zona registrada! Se verá en el mapa tras la aprobación.");
                 } else {
-                    alert("Error en base de datos: " + insertError.message);
+                    alert("Error: " + insertError.message);
                 }
             }
         }
@@ -136,5 +146,5 @@ map.on('click', async function(e) {
     input.click();
 });
 
-// 6. Ejecutar la carga inicial
+// 6. Ejecutar carga inicial
 cargarPuntosAprobados();
