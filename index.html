@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de Calistenia</title>
+    <title>Mapa de patrocinio</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
@@ -16,8 +16,54 @@
 
     <div class="panel-info">
         <h2>Reportar Nueva Zona</h2>
-        <p>Usa el buscador o mueve el mapa y haz clic en la ubicación exacta.</p>
-        <button class="btn-enviar" onclick="abrirFormulario()">Registrar Punto</button>
+        <p>Haz clic en el mapa para seleccionar una ubicación.</p>
+        <p id="instrucciones" style="font-size: 0.9em; margin-top: 10px; color: #ccc;">Usa el buscador o haz clic en el mapa</p>
+    </div>
+
+    <!-- MODAL FLOTANTE PARA FORMULARIO -->
+    <div id="modal-formulario" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Nueva Zona</h2>
+                <button class="modal-close" onclick="cerrarModal()">&times;</button>
+            </div>
+            
+            <form id="formulario-zona">
+                <div class="form-group">
+                    <label for="descripcion">Descripción de la Zona:</label>
+                    <input type="text" id="descripcion" placeholder="Ej: Parque central, esquina" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="tipoAnuncio">Tipo de Anuncio:</label>
+                    <select id="tipoAnuncio" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="Volante">Volante</option>
+                        <option value="Banner">Banner</option>
+                        <option value="Póster">Póster</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="persona">Promotor:</label>
+                    <input type="text" id="persona" placeholder="Tu nombre completo" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="foto">Seleccionar Imagen:</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="foto" accept="image/*" required>
+                        <span id="nombre-archivo">Ningún archivo seleccionado</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                    <button type="submit" class="btn-confirmar">Enviar Registro</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
