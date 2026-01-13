@@ -5,33 +5,31 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 2. Inicialización del Mapa
 const map = L.map('map', {
-    zoomControl: false // Desactiva los controles de zoom por defecto
+    zoomControl: false 
 }).setView([-12.0464, -77.0428], 13);
+
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Agregar controles de zoom en la parte inferior izquierda
-L.control.zoom({
-    position: 'bottomleft'
-}).addTo(map);
+// Zoom abajo a la izquierda para no estorbar al buscador
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-// --- NUEVO: INTEGRACIÓN DEL BUSCADOR (GEOCODER) ---
-// Se coloca aquí para que aparezca desde el inicio
+// --- BUSCADOR (GEOCODER) ---
 const geocoder = L.Control.geocoder({
     defaultMarkGeocode: false,
     placeholder: "Busca una calle o lugar...",
     errorMessage: "No se encontró el lugar.",
-    position: 'topleft' // Posiciona el buscador en la esquina superior izquierda
+    position: 'topleft' 
 })
 .on('markgeocode', function(e) {
     const latlng = e.geocode.center;
-    map.setView(latlng, 17); // Hace zoom al lugar encontrado
-    alert("¡Lugar encontrado! Ahora usa tu puntero para marcar la ubicación exacta.");
+    map.setView(latlng, 17);
+    alert("¡Lugar encontrado! Ahora haz clic exacto con tu puntero negro.");
 })
 .addTo(map);
 
-// --- NUEVA FUNCIÓN DE COMPRESIÓN TÉCNICA ---
+// --- COMPRESIÓN DE IMAGEN ---
 async function comprimirImagen(archivo) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -44,83 +42,27 @@ async function comprimirImagen(archivo) {
                 const MAX_WIDTH = 1000; 
                 let width = img.width;
                 let height = img.height;
-
                 if (width > MAX_WIDTH) {
                     height *= MAX_WIDTH / width;
                     width = MAX_WIDTH;
                 }
-
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob((blob) => {
-                    resolve(blob);
-                }, 'image/jpeg', 0.7); 
+                canvas.toBlob((blob) => { resolve(blob); }, 'image/jpeg', 0.7); 
             };
         };
     });
 }
 
-// 3. Función para cargar los puntos aprobados
-async function cargarPuntosAprobados() {
-    const { data, error } = await _supabase.from('puntos').select('*');
-
-    if (error) {
-        console.error("Error al cargar puntos:", error);
-        return;
-    }
-
-    if (data) {
-        data.forEach(p => {
-            if (p.estado === 'aprobado') {
-                const fotoHtml = p.foto_url 
-                    ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">` 
-                    : '<p style="text-align:center;">Sin foto disponible</p>';
-
-                L.marker([p.latitud, p.longitud])
-                    .addTo(map)
-                    .bindPopup(`
-                        <div style="text-align:center;">
-                            <b style="font-size:1.1em;">${p.nombre_patrocinador}</b><br>
-                            ${fotoHtml}
-                            <span style="color:blue; font-weight:bold;">Zona de Calistenia</span>
-                        </div>
-                    `);
-            }
-        });
-    }
-}
-
-// 4. Función para subir la imagen a Supabase Storage
-async function subirFoto(archivoOptimizado, nombreOriginal) {
-    const nombreArchivo = `${Date.now()}_comprimido.jpg`;
-    
-    const { data, error } = await _supabase.storage
-        .from('fotos') 
-        .upload(nombreArchivo, archivoOptimizado, {
-            contentType: 'image/jpeg'
-        });
-
-    if (error) {
-        alert("Error al subir la imagen: " + error.message);
-        return null;
-    }
-
-    const { data: urlData } = _supabase.storage.from('fotos').getPublicUrl(nombreArchivo);
-    return urlData.publicUrl;
-}
-
-// 5. Capturar clic en el mapa con el puntero personalizado
-let ubicacionActual = null;
+// 3. Capturar clic y abrir Modal
+let ubicacionActual = null; // IMPORTANTE: Se inicia en null
 
 map.on('click', function(e) {
-    const { lat, lng } = e.latlng;
-    ubicacionActual = { lat, lng };
-    console.log("Ubicación capturada:", ubicacionActual);
+    // Aquí capturamos la latitud y longitud del clic
+    ubicacionActual = { lat: e.latlng.lat, lng: e.latlng.lng };
     
-    // Mostrar el modal
     const modal = document.getElementById('modal-formulario');
     if (modal) {
         modal.style.display = 'flex';
@@ -129,103 +71,73 @@ map.on('click', function(e) {
     }
 });
 
-// Manejo del input de archivo - Esperar a que el DOM esté listo
-document.addEventListener('DOMContentLoaded', function() {
-    const fotoInput = document.getElementById('foto');
-    if (fotoInput) {
-        fotoInput.addEventListener('change', function(e) {
-            const archivo = e.target.files[0];
-            if (archivo) {
-                document.getElementById('nombre-archivo').textContent = `✓ ${archivo.name}`;
+// 4. Cargar Puntos Aprobados
+async function cargarPuntosAprobados() {
+    const { data, error } = await _supabase.from('puntos').select('*');
+    if (error) return;
+    if (data) {
+        data.forEach(p => {
+            if (p.estado === 'aprobado') {
+                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px;">` : '';
+                L.marker([p.latitud, p.longitud]).addTo(map)
+                .bindPopup(`<div style="text-align:center;"><b>${p.descripcion || 'Zona de Calistenia'}</b><br>${fotoHtml}</div>`);
             }
         });
     }
-});
-
-// Cerrar modal
-function cerrarModal() {
-    document.getElementById('modal-formulario').style.display = 'none';
-    document.getElementById('formulario-zona').reset();
-    document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
-    ubicacionActual = null;
 }
 
-// Manejo del formulario - Esperar a que el DOM esté listo
+// 5. Subir Foto
+async function subirFoto(archivoOptimizado) {
+    const nombreArchivo = `${Date.now()}_calistenia.jpg`;
+    const { data, error } = await _supabase.storage.from('fotos').upload(nombreArchivo, archivoOptimizado);
+    if (error) throw error;
+    const { data: urlData } = _supabase.storage.from('fotos').getPublicUrl(nombreArchivo);
+    return urlData.publicUrl;
+}
+
+// 6. Manejo del Formulario (DOMContentLoaded para asegurar que existan los IDs)
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formulario-zona');
     if (form) {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            if (!ubicacionActual) {
-                alert('⚠️ Debes hacer clic en el mapa primero para seleccionar una ubicación');
+            // VERIFICACIÓN DE SEGURIDAD PARA EVITAR EL ERROR DE NULL
+            if (!ubicacionActual || ubicacionActual.lat === undefined) {
+                alert('❌ Error: No se detectó la ubicación. Haz clic de nuevo en el mapa.');
                 return;
             }
-            
-            const descripcion = document.getElementById('descripcion').value;
-            const tipoAnuncio = document.getElementById('tipoAnuncio').value;
-            const persona = document.getElementById('persona').value;
+
+            const btnEnviar = document.querySelector('.btn-confirmar');
             const archivo = document.getElementById('foto').files[0];
             
-            if (!archivo) {
-                alert('⚠️ Por favor selecciona una imagen');
-                return;
-            }
-            
-            // Deshabilitar el botón de envío
-            const btnEnviar = document.querySelector('.btn-confirmar');
-            btnEnviar.disabled = true;
-            btnEnviar.textContent = 'Enviando...';
-            
+            if (!archivo) { alert('Selecciona una foto'); return; }
+
             try {
-                alert("Optimizando imagen...");
-                const imagenParaSubir = await comprimirImagen(archivo);
-                
-                alert("Subiendo a la nube...");
-                const urlFoto = await subirFoto(imagenParaSubir, archivo.name);
-                
-                if (urlFoto) {
-                    const { data: insertData, error: insertError } = await _supabase.from('puntos').insert([
-                        {
-                            latitud: ubicacionActual.lat,
-                            longitud: ubicacionActual.lng,
-                            nombre_persona: persona,
-                            nombre_patrocinador: persona,
-                            descripcion: descripcion,
-                            tipo_anuncio: tipoAnuncio,
-                            estado: 'pendiente',
-                            foto_url: urlFoto 
-                        }
-                    ]).select();
+                btnEnviar.disabled = true;
+                btnEnviar.textContent = 'Procesando...';
+
+                const imagenComprimida = await comprimirImagen(archivo);
+                const urlFinal = await subirFoto(imagenComprimida);
+
+                if (urlFinal) {
+                    const { error: insertError } = await _supabase.from('puntos').insert([{
+                        latitud: ubicacionActual.lat,
+                        longitud: ubicacionActual.lng,
+                        nombre_persona: document.getElementById('persona').value,
+                        descripcion: document.getElementById('descripcion').value,
+                        tipo_anuncio: document.getElementById('tipoAnuncio').value,
+                        estado: 'pendiente',
+                        foto_url: urlFinal
+                    }]);
 
                     if (!insertError) {
-                        alert("✅ ¡Zona registrada! Esperando validación del administrador.");
-                        cerrarModal();
-                        
-                        // Mostrar marcador temporal en el mapa con transparencia
-                        const fotoHtml = `<img src="${urlFoto}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">`;
-                        const marcador = L.marker([ubicacionActual.lat, ubicacionActual.lng], {
-                            opacity: 0.6 // Hacer el marcador semitransparente
-                        })
-                            .addTo(map)
-                            .bindPopup(`
-                                <div style="text-align:center; opacity:0.8;">
-                                    <b style="font-size:1.1em; color:#f39c12;">⏳ Esperando Validación</b><br>
-                                    <small style="color:#666;">${persona}</small><br>
-                                    ${fotoHtml}
-                                    <span style="color:#f39c12; font-weight:bold; font-size:0.9em;">En revisión</span>
-                                </div>
-                            `);
-                    } else {
-                        console.error("Error de inserción:", insertError);
-                        alert("❌ Error: " + insertError.message);
+                        alert("✅ ¡Enviado con éxito!");
+                        location.reload(); // Recarga para limpiar
                     }
-                } else {
-                    alert("❌ Error al subir la imagen");
                 }
-            } catch (error) {
-                console.error("Error:", error);
-                alert("❌ Error al procesar el registro: " + error.message);
+            } catch (err) {
+                alert("Error: " + err.message);
             } finally {
                 btnEnviar.disabled = false;
                 btnEnviar.textContent = 'Enviar Registro';
@@ -234,5 +146,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 6. Ejecutar carga inicial
 cargarPuntosAprobados();
