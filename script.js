@@ -89,7 +89,7 @@ document.addEventListener('keydown', function(e) {
     }
 })
 
-// 4. Cargar Puntos Aprobados
+// 4. Cargar Puntos Aprobados y Pendientes
 async function cargarPuntosAprobados() {
     const { data, error } = await _supabase.from('puntos').select('*');
     if (error) return;
@@ -99,6 +99,14 @@ async function cargarPuntosAprobados() {
                 const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px;">` : '';
                 L.marker([p.latitud, p.longitud]).addTo(map)
                 .bindPopup(`<div style="text-align:center;"><b>${p.descripcion || 'Zona de Calistenia'}</b><br>${fotoHtml}</div>`);
+            } else if (p.estado === 'pendiente') {
+                // Mostrar puntos pendientes con transparencia
+                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px;">` : '';
+                L.marker([p.latitud, p.longitud], {
+                    opacity: 0.5, // Semitransparente
+                    title: 'Pendiente de validación'
+                }).addTo(map)
+                .bindPopup(`<div style="text-align:center; opacity:0.9;"><b style="color:#f39c12;">⏳ ${p.descripcion || 'Esperando validación'}</b><br><small style="color:#666;">Subido por: ${p.nombre_persona}</small><br>${fotoHtml}<br><small style="color:#f39c12; font-weight:bold;">En revisión</small></div>`);
             }
         });
     }
@@ -174,9 +182,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     }]);
 
                     if (!insertError) {
-                        alert("✅ ¡Enviado con éxito!");
-                        cerrarModal();
-                        location.reload(); // Recarga para limpiar
+                        // Agregar marcador semitransparente al mapa
+                        const descripcion = document.getElementById('descripcion').value;
+                        const persona = document.getElementById('persona').value;
+                        
+                        agregarMarcadorPendiente(
+                            ubicacionActual.lat,
+                            ubicacionActual.lng,
+                            descripcion,
+                            persona,
+                            urlFinal
+                        );
+                        
+                        // Mostrar modal de éxito
+                        mostrarExito();
+                        
+                        // Cerrar modal del formulario después de 1.2 segundos
+                        setTimeout(() => {
+                            cerrarModal();
+                        }, 1200);
                     } else {
                         alert('❌ Error: ' + insertError.message);
                     }
@@ -194,6 +218,63 @@ document.addEventListener('DOMContentLoaded', function() {
 // Función para cambiar la imagen seleccionada
 function cambiarImagen() {
     document.getElementById('foto').click();
+}
+
+// Función para mostrar el modal de éxito
+function mostrarExito() {
+    const modalExito = document.getElementById('modal-exito');
+    const spinnerCarga = document.getElementById('spinner-carga');
+    const checkExito = document.getElementById('check-exito');
+    
+    // Mostrar modal
+    modalExito.style.display = 'flex';
+    spinnerCarga.style.display = 'block';
+    checkExito.style.display = 'none';
+    
+    // Cambiar a check después de 0.8 segundos
+    setTimeout(() => {
+        spinnerCarga.style.display = 'none';
+        checkExito.style.display = 'block';
+    }, 800);
+    
+    // Cerrar modal después de 2 segundos totales
+    setTimeout(() => {
+        modalExito.style.display = 'none';
+    }, 2000);
+}
+
+// Guardar ubicación y datos del último registro para el preview
+let ultimoRegistro = {
+    latitud: null,
+    longitud: null,
+    descripcion: null,
+    nombre_persona: null,
+    foto_url: null,
+    marcador: null
+};
+
+// Función para agregar marcador de preview pendiente
+function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona, foto_url) {
+    const fotoHtml = foto_url ? `<img src="${foto_url}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">` : '';
+    
+    // Crear marcador semitransparente
+    const marcador = L.marker([latitud, longitud], {
+        opacity: 0.5,
+        title: 'Pendiente de validación'
+    }).addTo(map)
+    .bindPopup(`<div style="text-align:center; opacity:0.9;"><b style="color:#f39c12;">⏳ ${descripcion}</b><br><small style="color:#666;">Subido por: ${nombre_persona}</small><br>${fotoHtml}<br><small style="color:#f39c12; font-weight:bold;">En revisión</small></div>`);
+    
+    marcador.openPopup();
+    
+    // Guardar referencia del marcador
+    ultimoRegistro = {
+        latitud,
+        longitud,
+        descripcion,
+        nombre_persona,
+        foto_url,
+        marcador
+    };
 }
 
 cargarPuntosAprobados();
