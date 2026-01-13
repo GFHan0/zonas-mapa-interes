@@ -81,13 +81,13 @@
         if (data) {
             data.forEach(p => {
                 const foto = p.foto_url ? `<img src="${p.foto_url}" width="60" title="Ampliar">` : '<i>Sin foto</i>';
-                // Usando el nombre correcto de tu columna: mensaje_admin
-                const motivo = p.mensaje_admin ? `<br><small style="color:#aaa;">Motivo: ${p.mensaje_admin}</small>` : '';
+                const motivo = p.mensaje_adm ? `<br><small style="color:#aaa;">Motivo: ${p.mensaje_adm}</small>` : '';
+                const detalles = `<br><small style="color:#bbb;">${p.nombre_persona} | ${p.tipo_anuncio || 'N/A'} | ${p.descripcion || 'N/A'}</small>`;
                 
                 tbody.innerHTML += `
                     <tr>
                         <td>${foto}</td>
-                        <td><b>${p.nombre_patrocinador}</b>${motivo}</td>
+                        <td><b>${p.nombre_patrocinador}</b>${detalles}${motivo}</td>
                         <td><span class="badge ${p.estado}">${p.estado}</span></td>
                         <td>
                             ${p.estado === 'pendiente' ? `<button class="btn btn-aprobar" onclick="actualizar(${p.id}, 'aprobado')">Aprobar ✅</button>` : ''}
@@ -110,10 +110,10 @@
         const motivo = prompt("¿Por qué rechazas este punto?");
         if (!motivo) return;
         
-        // Actualizamos usando mensaje_admin
+        // Actualizamos usando mensaje_adm
         const { error } = await _supabase
             .from('puntos')
-            .update({ estado: 'rechazado', mensaje_admin: motivo }) 
+            .update({ estado: 'rechazado', mensaje_adm: motivo }) 
             .eq('id', id);
             
         if (error) alert(error.message);
