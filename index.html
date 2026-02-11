@@ -3,14 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de patrocinio</title>
+    <title>Pintas</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Botón para mostrar/ocultar ruta -->
+    <div id="control-ruta">
+        <button id="btn-toggle-ruta" onclick="toggleRuta()">
+            <span id="icono-ruta">🗺️</span> <span id="texto-ruta">Mostrar Ruta</span>
+        </button>
+    </div>
+
+    <!-- Lista de puntos para la ruta -->
+    <div id="panel-puntos">
+        <div class="panel-titulo">Puntos de la Ruta</div>
+        <div id="lista-puntos"></div>
+        <div class="panel-ayuda">Desmarca los puntos que no quieras incluir.</div>
+    </div>
 
     <div id="map"></div>
 
@@ -34,6 +49,11 @@
                 <div class="form-group">
                     <label for="descripcion">Descripción de la Zona:</label>
                     <input type="text" id="descripcion" placeholder="Ej: Parque central, esquina" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="fecha">Fecha de Registro:</label>
+                    <input type="date" id="fecha" required>
                 </div>
 
                 <div class="form-group">
@@ -70,6 +90,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
