@@ -58,6 +58,11 @@ async function comprimirImagen(archivo) {
 
 // 3. Capturar clic y abrir Modal
 let ubicacionActual = null; // IMPORTANTE: Se inicia en null
+let controlRuta = null; // Control de routing
+let rutaVisible = false; // Estado de visibilidad de la ruta
+let marcadoresNumeros = []; // Marcadores con números de secuencia
+let puntosRutaAprobados = []; // Lista ordenada de puntos aprobados
+let puntosSeleccionados = new Set(); // IDs seleccionados para la ruta
 
 map.on('click', function(e) {
     // Aquí capturamos la latitud y longitud del clic
@@ -67,6 +72,11 @@ map.on('click', function(e) {
     if (modal) {
         modal.style.display = 'flex';
         document.getElementById('formulario-zona').reset();
+        
+        // Establecer fecha de hoy por defecto
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fecha').value = hoy;
+        
         document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
     }
 });
@@ -102,23 +112,101 @@ async function cargarPuntosAprobados() {
     const { data, error } = await _supabase.from('puntos').select('*');
     if (error) return;
     if (data) {
+        const puntosOrdenados = [];
+        
         data.forEach(p => {
             if (p.estado === 'aprobado') {
-                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px;">` : '';
+                const fechaFormateada = p.fecha_registro ? formatearFecha(p.fecha_registro) : 'Sin fecha';
+                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px; margin:10px 0;">` : '';
+                
                 L.marker([p.latitud, p.longitud]).addTo(map)
-                .bindPopup(`<div style="text-align:center;"><b>${p.descripcion || 'Zona de Calistenia'}</b><br>${fotoHtml}</div>`);
+                .bindPopup(`<div style="text-align:center;">
+                    <b style="color:#27ae60; font-size:1.1em;">${p.descripcion}</b>
+                    <br><small style="color:#666; font-weight:bold;">📅 ${fechaFormateada}</small>
+                    <br><small style="color:#999;">Por: ${p.nombre_persona}</small>
+                    ${fotoHtml}
+                </div>`);
+                
+                // Agregar a la lista para la ruta
+                puntosOrdenados.push({
+                    id: p.id,
+                    lat: p.latitud,
+                    lng: p.longitud,
+                    fecha: p.fecha_registro,
+                    descripcion: p.descripcion
+                });
             } else if (p.estado === 'pendiente') {
-                // Mostrar puntos pendientes con transparencia
-                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px;">` : '';
+                const fechaFormateada = p.fecha_registro ? formatearFecha(p.fecha_registro) : 'Sin fecha';
+                const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px; margin:10px 0;">` : '';
+                
                 L.marker([p.latitud, p.longitud], {
-                    opacity: 0.5, // Semitransparente
+                    opacity: 0.5,
                     title: 'Pendiente de validación'
                 }).addTo(map)
-                .bindPopup(`<div style="text-align:center; opacity:0.9;"><b style="color:#f39c12;">⏳ ${p.descripcion || 'Esperando validación'}</b><br><small style="color:#666;">Subido por: ${p.nombre_persona}</small><br>${fotoHtml}<br><small style="color:#f39c12; font-weight:bold;">En revisión</small></div>`);
+                .bindPopup(`<div style="text-align:center; opacity:0.9;">
+                    <b style="color:#f39c12;">⏳ ${p.descripcion}</b>
+                    <br><small style="color:#666;">📅 ${fechaFormateada}</small>
+                    <br><small style="color:#666;">Subido por: ${p.nombre_persona}</small>
+                    ${fotoHtml}
+                    <br><small style="color:#f39c12; font-weight:bold;">En revisión</small>
+                </div>`);
             }
         });
+        
+        // Ordenar puntos por fecha para la ruta
+        puntosOrdenados.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        puntosRutaAprobados = puntosOrdenados;
+        puntosSeleccionados = new Set(puntosOrdenados.map(p => p.id));
+        renderListaPuntos();
     }
 }
+
+// Función para formatear fecha
+function formatearFecha(fechaString) {
+    if (!fechaString) return 'Sin fecha';
+    const fecha = new Date(fechaString + 'T00:00:00');
+    const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
+    return fecha.toLocaleDateString('es-ES', opciones);
+}
+
+function escapeHtml(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto || '';
+    return div.innerHTML;
+}
+
+function renderListaPuntos() {
+    const contenedor = document.getElementById('lista-puntos');
+    if (!contenedor) return;
+
+    contenedor.innerHTML = '';
+    puntosRutaAprobados.forEach(p => {
+        const item = document.createElement('label');
+        item.className = 'punto-item';
+        item.innerHTML = `
+            <input type="checkbox" data-id="${p.id}" ${puntosSeleccionados.has(p.id) ? 'checked' : ''}>
+            <span>
+                <span class="punto-nombre">${escapeHtml(p.descripcion)}</span>
+                <span class="punto-fecha">${formatearFecha(p.fecha)}</span>
+            </span>
+        `;
+        contenedor.appendChild(item);
+    });
+}
+
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.matches('#lista-puntos input[type="checkbox"]')) {
+        const id = Number(e.target.getAttribute('data-id'));
+        if (e.target.checked) {
+            puntosSeleccionados.add(id);
+        } else {
+            puntosSeleccionados.delete(id);
+        }
+        if (rutaVisible) {
+            construirRutaSeleccionada();
+        }
+    }
+});
 
 // 5. Subir Foto
 async function subirFoto(archivoOptimizado) {
@@ -173,6 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Guardar datos antes de cerrar el modal
             const descripcion = document.getElementById('descripcion').value;
             const persona = document.getElementById('persona').value;
+            const fecha = document.getElementById('fecha').value;
 
             // Cerrar modal del formulario INMEDIATAMENTE
             cerrarModal();
@@ -192,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         nombre_patrocinador: persona,
                         descripcion: descripcion,
                         tipo_anuncio: document.getElementById('tipoAnuncio').value,
+                        fecha_registro: fecha,
                         estado: 'pendiente',
                         foto_url: urlFinal
                     }]);
@@ -274,6 +364,7 @@ let ultimoRegistro = {
 
 // Función para agregar marcador de preview pendiente
 function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona, foto_url) {
+    const fechaHoy = formatearFecha(new Date().toISOString().split('T')[0]);
     const fotoHtml = foto_url ? `<img src="${foto_url}" width="150px" style="border-radius:8px; display:block; margin:10px auto;">` : '';
     
     // Crear marcador semitransparente
@@ -281,7 +372,13 @@ function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona
         opacity: 0.5,
         title: 'Pendiente de validación'
     }).addTo(map)
-    .bindPopup(`<div style="text-align:center; opacity:0.9;"><b style="color:#f39c12;">⏳ ${descripcion}</b><br><small style="color:#666;">Subido por: ${nombre_persona}</small><br>${fotoHtml}<br><small style="color:#f39c12; font-weight:bold;">En revisión</small></div>`);
+    .bindPopup(`<div style="text-align:center; opacity:0.9;">
+        <b style="color:#f39c12;">⏳ ${descripcion}</b>
+        <br><small style="color:#666;">📅 ${fechaHoy}</small>
+        <br><small style="color:#666;">Subido por: ${nombre_persona}</small>
+        ${fotoHtml}
+        <br><small style="color:#f39c12; font-weight:bold;">En revisión</small>
+    </div>`);
     
     marcador.openPopup();
     
@@ -294,6 +391,98 @@ function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona
         foto_url,
         marcador
     };
+}
+
+// Función para dibujar/ocultar la ruta
+function toggleRuta() {
+    if (!puntosRutaAprobados || puntosRutaAprobados.length < 2) {
+        alert('⚠️ Se necesitan al menos 2 puntos aprobados para mostrar una ruta');
+        return;
+    }
+    
+    if (rutaVisible) {
+        // Ocultar ruta
+        if (controlRuta) {
+            map.removeControl(controlRuta);
+            controlRuta = null;
+        }
+        // Eliminar marcadores de números
+        marcadoresNumeros.forEach(marcador => map.removeLayer(marcador));
+        marcadoresNumeros = [];
+        
+        rutaVisible = false;
+        document.getElementById('texto-ruta').textContent = 'Mostrar Ruta';
+        document.getElementById('icono-ruta').textContent = '🗺️';
+        document.getElementById('btn-toggle-ruta').style.background = '#27ae60';
+        document.getElementById('panel-puntos').classList.remove('panel-visible');
+    } else {
+        document.getElementById('panel-puntos').classList.add('panel-visible');
+        construirRutaSeleccionada();
+    }
+}
+
+function construirRutaSeleccionada() {
+    const puntos = puntosRutaAprobados.filter(p => puntosSeleccionados.has(p.id));
+    if (puntos.length < 2) {
+        if (controlRuta) {
+            map.removeControl(controlRuta);
+            controlRuta = null;
+        }
+        rutaVisible = false;
+        document.getElementById('texto-ruta').textContent = 'Mostrar Ruta';
+        document.getElementById('icono-ruta').textContent = '🗺️';
+        document.getElementById('btn-toggle-ruta').style.background = '#27ae60';
+        document.getElementById('panel-puntos').classList.remove('panel-visible');
+        return;
+    }
+
+    if (controlRuta) {
+        map.removeControl(controlRuta);
+        controlRuta = null;
+    }
+
+    const waypoints = puntos.map(p => L.latLng(p.lat, p.lng));
+
+    controlRuta = L.Routing.control({
+        waypoints: waypoints,
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        lineOptions: {
+            styles: [{
+                color: '#e74c3c',
+                opacity: 0.8,
+                weight: 6
+            }]
+        },
+        createMarker: function(i, waypoint, n) {
+            return L.marker(waypoint.latLng, {
+                icon: L.divIcon({
+                    className: 'numero-ruta',
+                    html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); font-size: 16px;">${i + 1}</div>`,
+                    iconSize: [35, 35]
+                }),
+                draggable: false
+            });
+        },
+        router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'driving'
+        })
+    }).addTo(map);
+
+    const contenedorInstrucciones = document.querySelector('.leaflet-routing-container');
+    if (contenedorInstrucciones) {
+        contenedorInstrucciones.style.display = 'none';
+    }
+
+    rutaVisible = true;
+    document.getElementById('texto-ruta').textContent = 'Ocultar Ruta';
+    document.getElementById('icono-ruta').textContent = '✖️';
+    document.getElementById('btn-toggle-ruta').style.background = '#e74c3c';
+    document.getElementById('panel-puntos').classList.add('panel-visible');
 }
 
 cargarPuntosAprobados();
