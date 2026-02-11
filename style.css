@@ -14,6 +14,167 @@ body {
 }
 
 /* =========================================
+    BOTÓN DE CONTROL DE RUTA
+   ========================================= */
+#control-ruta {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#panel-puntos {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 999;
+    width: 260px;
+    max-height: 60vh;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    padding: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transform: translateX(120%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+#panel-puntos.panel-visible {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.panel-titulo {
+    font-weight: bold;
+    color: #27ae60;
+    font-size: 1em;
+}
+
+#lista-puntos {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.punto-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.9em;
+    color: #333;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.punto-item input {
+    margin-top: 2px;
+}
+
+.punto-nombre {
+    font-weight: bold;
+    color: #2c3e50;
+    display: block;
+}
+
+.punto-fecha {
+    display: block;
+    color: #666;
+    font-size: 0.85em;
+    margin-top: 2px;
+}
+
+.panel-ayuda {
+    color: #666;
+    font-size: 0.8em;
+}
+
+#btn-toggle-ruta {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#btn-toggle-ruta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+#btn-toggle-ruta:active {
+    transform: translateY(0);
+}
+
+#icono-ruta {
+    font-size: 1.2em;
+}
+
+/* =========================================
+    OCULTAR PANEL DE INSTRUCCIONES DE RUTA
+   ========================================= */
+.leaflet-routing-container {
+    display: none;
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 350px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 999;
+    padding: 15px;
+}
+
+.leaflet-routing-container h2,
+.leaflet-routing-container h3 {
+    color: #27ae60;
+    font-size: 1.1em;
+    margin: 10px 0;
+}
+
+.leaflet-routing-alt {
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 5px 0;
+}
+
+.leaflet-routing-alt table {
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.leaflet-routing-alt td {
+    padding: 5px;
+}
+
+.leaflet-routing-alt-minimized {
+    display: none;
+}
+
+.leaflet-routing-alternatives-container {
+    display: none !important;
+}
+
+/* =========================================
     2. CURSOR PERSONALIZADO 
    ========================================= */
 
