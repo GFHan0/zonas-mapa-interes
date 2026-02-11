@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Panel Admin - Validación de Puntos</title>
+    <title>Panel Admin - Validacion de Pintas</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; padding: 20px; margin: 0; }
@@ -38,7 +38,7 @@
 </div>
 
 <div class="container">
-    <h1>Validación de Zonas de Calistenia</h1>
+    <h1>Validacion de Pintas</h1>
     <p style="text-align: center; color: #aaa;">Gestiona los reportes recibidos desde el mapa.</p>
     <table>
         <thead>
@@ -102,6 +102,7 @@
                         <td><span class="badge ${p.estado}">${p.estado}</span></td>
                         <td>
                             ${p.estado === 'pendiente' ? `<button class="btn btn-aprobar" onclick="actualizar(${p.id}, 'aprobado')">Aprobar ✅</button>` : ''}
+                            <button class="btn btn-aprobar" onclick="editar(${p.id})">Editar ✏️</button>
                             <button class="btn btn-rechazar" onclick="rechazar(${p.id})">Rechazar ✖</button>
                             <button class="btn btn-eliminar" onclick="eliminar(${p.id})">Eliminar 🗑</button>
                         </td>
@@ -114,6 +115,46 @@
     async function actualizar(id, nuevoEstado) {
         const { error } = await _supabase.from('puntos').update({ estado: nuevoEstado }).eq('id', id);
         if (error) alert(error.message);
+        cargarReporte();
+    }
+
+    async function editar(id) {
+        const { data, error } = await _supabase
+            .from('puntos')
+            .select('descripcion, nombre_persona, tipo_anuncio, fecha_registro')
+            .eq('id', id)
+            .single();
+
+        if (error || !data) {
+            alert('No se pudo cargar el registro');
+            return;
+        }
+
+        const nuevaDescripcion = prompt('Descripcion del punto:', data.descripcion || '');
+        if (nuevaDescripcion === null) return;
+
+        const nuevoPromotor = prompt('Nombre del promotor:', data.nombre_persona || '');
+        if (nuevoPromotor === null) return;
+
+        const nuevoTipo = prompt('Tipo de anuncio:', data.tipo_anuncio || '');
+        if (nuevoTipo === null) return;
+
+        const nuevaFecha = prompt('Fecha (YYYY-MM-DD):', data.fecha_registro || '');
+        if (nuevaFecha === null) return;
+
+        const { error: updateError } = await _supabase
+            .from('puntos')
+            .update({
+                descripcion: nuevaDescripcion,
+                nombre_persona: nuevoPromotor,
+                tipo_anuncio: nuevoTipo,
+                fecha_registro: nuevaFecha
+            })
+            .eq('id', id);
+
+        if (updateError) {
+            alert(updateError.message);
+        }
         cargarReporte();
     }
 
