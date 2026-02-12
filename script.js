@@ -322,10 +322,15 @@ async function cargarPuntosAprobados() {
     if (data) {
         pintasRegistradas = [];
         data.forEach(p => {
+            const lat = normalizarNumero(p.latitud);
+            const lng = normalizarNumero(p.longitud);
+            if (lat === null || lng === null) {
+                return;
+            }
             pintasRegistradas.push({
                 id: p.id,
-                lat: p.latitud,
-                lng: p.longitud,
+                lat,
+                lng,
                 fecha: p.fecha_registro,
                 descripcion: p.descripcion,
                 estado: p.estado
@@ -334,7 +339,7 @@ async function cargarPuntosAprobados() {
                 const fechaFormateada = p.fecha_registro ? formatearFecha(p.fecha_registro) : 'Sin fecha';
                 const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px; margin:10px 0;">` : '';
                 
-                const marcador = L.marker([p.latitud, p.longitud]).addTo(map)
+                const marcador = L.marker([lat, lng]).addTo(map)
                 .bindPopup(`<div style="text-align:center;">
                     <b style="color:#27ae60; font-size:1.1em;">${p.descripcion}</b>
                     <br><small style="color:#666; font-weight:bold;">📅 ${fechaFormateada}</small>
@@ -346,7 +351,7 @@ async function cargarPuntosAprobados() {
                 const fechaFormateada = p.fecha_registro ? formatearFecha(p.fecha_registro) : 'Sin fecha';
                 const fotoHtml = p.foto_url ? `<img src="${p.foto_url}" width="150px" style="border-radius:8px; margin:10px 0;">` : '';
                 
-                const marcador = L.marker([p.latitud, p.longitud], {
+                const marcador = L.marker([lat, lng], {
                     opacity: 0.5,
                     title: 'Pendiente de validación'
                 }).addTo(map)
@@ -405,6 +410,14 @@ function escapeHtml(texto) {
     const div = document.createElement('div');
     div.textContent = texto || '';
     return div.innerHTML;
+}
+
+function normalizarNumero(valor) {
+    if (valor === null || valor === undefined) return null;
+    const texto = String(valor).replace(',', '.').trim();
+    if (!texto) return null;
+    const numero = Number(texto);
+    return Number.isFinite(numero) ? numero : null;
 }
 
 function obtenerDescripcionBase(descripcion) {
@@ -537,7 +550,6 @@ function renderListaPintas() {
         contenedor.appendChild(item);
     });
 }
-
 document.addEventListener('change', function(e) {
     if (e.target && e.target.matches('#lista-rutas input[type="checkbox"]')) {
         const clave = e.target.getAttribute('data-key');
