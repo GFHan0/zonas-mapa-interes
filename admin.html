@@ -41,12 +41,21 @@
 </div>
 
 <div class="container">
+    <div style="background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+        <h3 style="color: #aaa; margin: 0 0 10px 0;">Descarga de Datos (CSV)</h3>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-aprobar" onclick="descargarCsvPintas()">Pintas (Todo)</button>
+            <button class="btn btn-aprobar" onclick="descargarCsvPintasAprobadas()">Pintas (Aprobadas)</button>
+            <span style="color:#444; font-size: 1.5em; font-weight:lighter;">|</span>
+            <button class="btn btn-aprobar" onclick="descargarCsvRutas()">Rutas (Todo)</button>
+            <button class="btn btn-aprobar" onclick="descargarCsvRutasAprobadas()">Rutas (Aprobadas)</button>
+            <span style="color:#444; font-size: 1.5em; font-weight:lighter;">|</span>
+            <button class="btn btn-rechazar" onclick="descargarCsvTodo()">DESCARGAR TODO</button>
+        </div>
+    </div>
+
     <h1>Validacion de Pintas</h1>
     <p style="text-align: center; color: #aaa;">Gestiona los reportes recibidos desde el mapa.</p>
-    <p style="text-align: center; margin: 10px 0 0;">
-        <button class="btn btn-aprobar" onclick="descargarCsvPintas()">Descargar CSV Pintas</button>
-        <button class="btn btn-aprobar" onclick="descargarCsvPintasAprobadas()">Descargar CSV Pintas Aprobadas</button>
-    </p>
     <table>
         <thead>
             <tr>
@@ -60,11 +69,7 @@
     </table>
 
     <h1 style="margin-top: 40px;">Validacion de Rutas</h1>
-    <p style="text-align: center; color: #aaa;">Gestiona los registros de rutas.</p>
-    <p style="text-align: center; margin: 10px 0 0;">
-        <button class="btn btn-aprobar" onclick="descargarCsvRutas()">Descargar CSV Rutas</button>
-        <button class="btn btn-aprobar" onclick="descargarCsvRutasAprobadas()">Descargar CSV Rutas Aprobadas</button>
-    </p>
+    <p style="text-align: center; color: #aaa;">Gestiona los registros de rutas (Agrupadas).</p>
     <table>
         <thead>
             <tr>
@@ -244,8 +249,15 @@
 
     function obtenerDescripcionBase(descripcion) {
         const texto = descripcion || '';
-        const partes = texto.split(/ \| (Coord|Inicio|Punto inicio|Direccion|Coordenada):/);
-        return partes[0].replace(/\s*\(\d+\)\s*$/, '').trim();
+        // Intenta separar por el delimitador estándar
+        // Se asume que la descripción base está antes del primer " | "
+        // o antes de los metadatos de Coordenada/Dirección
+        const partes = texto.split(/ \| (Coord|Inicio|Punto inicio|Direccion|Coordenada):/); 
+        let base = partes[0];
+        
+        // Limpieza agresiva de índice final (ej: "Mi Ruta (1)" -> "Mi Ruta")
+        // Se asegura de borrar espacios y el parentesis final
+        return base.replace(/\s*\(\d+\)\s*$/, '').trim();
     }
 
     function normalizarTexto(texto) {
@@ -421,6 +433,53 @@
         ]);
         const csv = convertirACsv(filas, columnas);
         descargarArchivo('rutas_aprobadas.csv', csv);
+    }
+
+    async function descargarCsvTodo() {
+        const { data: pintas, error: errP } = await _supabase.from('puntos').select('*').order('id', { ascending: false });
+        if (errP) { alert('Error leyendo pintas: ' + errP.message); return; }
+
+        const { data: rutas, error: errR } = await _supabase.from('rutas').select('*').order('id', { ascending: false });
+        if (errR) { alert('Error leyendo rutas: ' + errR.message); return; }
+
+        const filas = [];
+        (pintas || []).forEach(p => {
+            filas.push({
+                tipo_dato: 'PINTA',
+                id: p.id,
+                descripcion: p.descripcion,
+                tipo_anuncio: p.tipo_anuncio,
+                estado: p.estado,
+                fecha_registro: p.fecha_registro,
+                latitud: p.latitud,
+                longitud: p.longitud,
+                nombre_persona: p.nombre_persona,
+                foto_url: p.foto_url,
+                mensaje_adm: p.mensaje_adm
+            });
+        });
+        (rutas || []).forEach(r => {
+            filas.push({
+                tipo_dato: 'RUTA',
+                id: r.id,
+                descripcion: r.descripcion,
+                tipo_anuncio: 'N/A',
+                estado: r.estado,
+                fecha_registro: r.fecha_registro,
+                latitud: r.latitud,
+                longitud: r.longitud,
+                nombre_persona: r.nombre_persona,
+                foto_url: r.foto_url,
+                mensaje_adm: r.mensaje_adm
+            });
+        });
+
+        const csv = convertirACsv(filas, [
+            'tipo_dato', 'id', 'descripcion', 'tipo_anuncio', 'estado', 
+            'fecha_registro', 'latitud', 'longitud', 
+            'nombre_persona', 'mensaje_adm', 'foto_url'
+        ]);
+        descargarArchivo('TODO_REGISTROS.csv', csv);
     }
 
     async function actualizar(id, nuevoEstado) {
@@ -620,3 +679,4 @@
 </script>
 </body>
 </html>
+
