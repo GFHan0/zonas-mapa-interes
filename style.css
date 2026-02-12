@@ -40,6 +40,7 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-content: flex-end;
     flex-wrap: nowrap;
 }
 
@@ -52,6 +53,7 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-content: flex-end;
     flex-wrap: nowrap;
 }
 
@@ -59,15 +61,14 @@ body {
     display: none;
     gap: 8px;
     opacity: 0;
-    transform: translateY(-6px);
+    justify-content: flex-end;
     pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 #control-ruta-extra.ruta-extra-visible {
     display: flex;
     opacity: 1;
-    transform: translateY(0);
     pointer-events: auto;
 }
 
