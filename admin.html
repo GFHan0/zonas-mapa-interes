@@ -24,7 +24,8 @@
         img:hover { transform: scale(4); position: relative; z-index: 100; border: 2px solid white; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .login-box { text-align: center; background: #2d2d2d; padding: 40px; border-radius: 15px; border: 1px solid #444; }
-        input[type="password"] { padding: 12px; border-radius: 5px; border: 1px solid #444; background: #1a1a1a; color: white; margin-bottom: 20px; width: 200px; display: block; }
+        input[type="email"],
+        input[type="password"] { padding: 12px; border-radius: 5px; border: 1px solid #444; background: #1a1a1a; color: white; margin-bottom: 12px; width: 240px; display: block; }
     </style>
 </head>
 <body>
@@ -32,8 +33,9 @@
 <div id="login" class="login-overlay">
     <div class="login-box">
         <h2>Acceso Restringido</h2>
-        <input type="password" id="pass" placeholder="Contraseña de Admin">
-        <button class="btn btn-aprobar" onclick="verificar()">Entrar al Panel</button>
+        <input type="email" id="admin-email" placeholder="Correo de Admin">
+        <input type="password" id="admin-pass" placeholder="Contrasena de Admin">
+        <button class="btn btn-aprobar" onclick="verificarAdmin()">Entrar al Panel</button>
     </div>
 </div>
 
@@ -51,6 +53,20 @@
         </thead>
         <tbody id="tabla-puntos"></tbody>
     </table>
+
+    <h1 style="margin-top: 40px;">Validacion de Rutas</h1>
+    <p style="text-align: center; color: #aaa;">Gestiona los registros de rutas.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Foto</th>
+                <th>Detalles de la Ruta</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-rutas"></tbody>
+    </table>
 </div>
 
 <script>
@@ -58,14 +74,10 @@
     const SUPABASE_KEY = 'sb_publishable_8QmGDNmTJSCnnQT22-SSBA_9UFzR0YN';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function verificar() {
-        const p = document.getElementById('pass').value;
-        if (p === "ADMIN2026") { 
-            document.getElementById('login').style.display = 'none';
-            cargarReporte();
-        } else {
-            alert("Clave incorrecta");
-        }
+    function verificarAdmin() {
+        document.getElementById('login').style.display = 'none';
+        cargarReporte();
+        cargarRutas();
     }
 
     async function cargarReporte() {
@@ -112,10 +124,58 @@
         }
     }
 
+    async function cargarRutas() {
+        const { data, error } = await _supabase
+            .from('rutas')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            console.error("Error:", error.message);
+            return;
+        }
+
+        const tbody = document.getElementById('tabla-rutas');
+        tbody.innerHTML = "";
+
+        if (data) {
+            data.forEach(r => {
+                const foto = r.foto_url ? `<img src="${r.foto_url}" width="60" height="60" title="Pasa el mouse para ampliar">` : '<i>Sin foto</i>';
+                const titulo = r.descripcion || "Ruta sin descripcion";
+                const sublinea = `<br><small style="color:#bbb;">Subido por: <b>${r.nombre_persona || 'Anonimo'}</b> | Fecha: ${r.fecha_registro || 'N/A'}</small>`;
+                const motivoRechazo = r.mensaje_adm ? `<br><small style="color:#ff9f43;">Nota Admin: ${r.mensaje_adm}</small>` : '';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${foto}</td>
+                        <td>
+                            <span style="color:#27ae60; font-weight:bold; font-size:1.1em;">${titulo}</span>
+                            ${sublinea}
+                            ${motivoRechazo}
+                        </td>
+                        <td><span class="badge ${r.estado}">${r.estado}</span></td>
+                        <td>
+                            ${r.estado === 'pendiente' ? `<button class="btn btn-aprobar" onclick="actualizarRuta(${r.id}, 'aprobado')">Aprobar ✅</button>` : ''}
+                            <button class="btn btn-aprobar" onclick="editarRuta(${r.id})">Editar ✏️</button>
+                            <button class="btn btn-rechazar" onclick="rechazarRuta(${r.id})">Rechazar ✖</button>
+                            <button class="btn btn-eliminar" onclick="eliminarRuta(${r.id})">Eliminar 🗑</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    }
+
     async function actualizar(id, nuevoEstado) {
         const { error } = await _supabase.from('puntos').update({ estado: nuevoEstado }).eq('id', id);
         if (error) alert(error.message);
         cargarReporte();
+    }
+
+    async function actualizarRuta(id, nuevoEstado) {
+        const { error } = await _supabase.from('rutas').update({ estado: nuevoEstado }).eq('id', id);
+        if (error) alert(error.message);
+        cargarRutas();
     }
 
     async function editar(id) {
@@ -158,6 +218,42 @@
         cargarReporte();
     }
 
+    async function editarRuta(id) {
+        const { data, error } = await _supabase
+            .from('rutas')
+            .select('descripcion, nombre_persona, fecha_registro')
+            .eq('id', id)
+            .single();
+
+        if (error || !data) {
+            alert('No se pudo cargar el registro');
+            return;
+        }
+
+        const nuevaDescripcion = prompt('Direccion de la ruta:', data.descripcion || '');
+        if (nuevaDescripcion === null) return;
+
+        const nuevoPromotor = prompt('Nombre de quien lo sube:', data.nombre_persona || '');
+        if (nuevoPromotor === null) return;
+
+        const nuevaFecha = prompt('Fecha (YYYY-MM-DD):', data.fecha_registro || '');
+        if (nuevaFecha === null) return;
+
+        const { error: updateError } = await _supabase
+            .from('rutas')
+            .update({
+                descripcion: nuevaDescripcion,
+                nombre_persona: nuevoPromotor,
+                fecha_registro: nuevaFecha
+            })
+            .eq('id', id);
+
+        if (updateError) {
+            alert(updateError.message);
+        }
+        cargarRutas();
+    }
+
     async function rechazar(id) {
         const motivo = prompt("Motivo del rechazo:");
         if (!motivo) return;
@@ -171,11 +267,32 @@
         cargarReporte();
     }
 
+    async function rechazarRuta(id) {
+        const motivo = prompt("Motivo del rechazo:");
+        if (!motivo) return;
+
+        const { error } = await _supabase
+            .from('rutas')
+            .update({ estado: 'rechazado', mensaje_adm: motivo })
+            .eq('id', id);
+
+        if (error) alert(error.message);
+        cargarRutas();
+    }
+
     async function eliminar(id) {
         if (confirm("¿Estás seguro de eliminar permanentemente este registro?")) {
             const { error } = await _supabase.from('puntos').delete().eq('id', id);
             if (error) alert(error.message);
             cargarReporte();
+        }
+    }
+
+    async function eliminarRuta(id) {
+        if (confirm("¿Estás seguro de eliminar permanentemente este registro?")) {
+            const { error } = await _supabase.from('rutas').delete().eq('id', id);
+            if (error) alert(error.message);
+            cargarRutas();
         }
     }
 </script>
