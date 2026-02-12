@@ -27,9 +27,20 @@ body {
     gap: 8px;
 }
 
+.control-invisible {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.controles-bloqueados {
+    pointer-events: none;
+    opacity: 0.6;
+}
 .ruta-botones {
     display: flex;
     gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
 }
 
 .control-oculto {
@@ -40,6 +51,8 @@ body {
 #control-pintas-extra {
     display: flex;
     gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
 }
 
 #control-ruta-extra {
@@ -60,19 +73,20 @@ body {
 
 #panel-puntos {
     position: fixed;
-    top: 80px;
-    right: 20px;
+    top: 96px;
+    right: 24px;
     z-index: 999;
-    width: 260px;
+    width: 252px;
     max-height: 60vh;
     background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-    padding: 12px;
+    padding: 10px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     transform: translateX(120%);
     opacity: 0;
     pointer-events: none;
@@ -89,23 +103,23 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
 }
 
 .panel-titulo {
     font-weight: bold;
     color: #27ae60;
-    font-size: 1em;
+    font-size: 0.95em;
 }
 
 #btn-cerrar-rutas {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border: none;
     border-radius: 8px;
     background: #e74c3c;
     color: white;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     cursor: pointer;
     line-height: 1;
@@ -213,6 +227,18 @@ body {
     transition: background 0.2s ease, transform 0.2s ease;
 }
 
+#btn-mostrar-rutas {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
 #btn-cancelar-pintas {
     background: #7f8c8d;
     color: white;
@@ -237,6 +263,18 @@ body {
     transition: background 0.2s ease, transform 0.2s ease;
 }
 
+#btn-toggle-ambos {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
 #btn-toggle-add.activo {
     background: #6c7a7b;
 }
@@ -250,7 +288,9 @@ body {
 #btn-toggle-ruta:hover,
 #btn-toggle-add:hover,
 #btn-toggle-pintas:hover,
+#btn-toggle-ambos:hover,
 #btn-mostrar-pintas:hover,
+#btn-mostrar-rutas:hover,
 #btn-activar-pintas:hover,
 #btn-cancelar-pintas:hover,
 #btn-aceptar-ruta:hover,
