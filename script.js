@@ -116,22 +116,27 @@ function ocultarPanelRutas() {
 function setBotonRuta(visible) {
     const btnRuta = document.getElementById('btn-toggle-ruta');
     if (!btnRuta) return;
-    btnRuta.textContent = 'Rutas';
+    if (modoAgregarRuta) {
+        btnRuta.textContent = 'Cancelar';
+        return;
+    }
+    btnRuta.textContent = visible ? 'Salir' : 'Rutas';
 }
 
 function setBotonPintas(visible) {
     const btnPintas = document.getElementById('btn-toggle-pintas');
     if (!btnPintas) return;
-    btnPintas.textContent = 'Pintas';
+    if (modoAgregarPintas) {
+        btnPintas.textContent = 'Cancelar';
+        return;
+    }
+    btnPintas.textContent = visible ? 'Salir' : 'Pintas';
 }
 
 function setCancelarRutaTopVisible(visible, etiqueta) {
     const btnCancelarTop = document.getElementById('btn-cancelar-ruta-top');
     if (!btnCancelarTop) return;
-    btnCancelarTop.classList.toggle('control-oculto', !visible);
-    if (etiqueta) {
-        btnCancelarTop.textContent = etiqueta;
-    }
+    btnCancelarTop.classList.add('control-oculto');
 }
 
 function setBotonesPrincipalesVisible(mostrarRuta, mostrarPintas) {
@@ -153,6 +158,20 @@ function mostrarOpcionesRuta(visible) {
     opciones.classList.toggle('control-oculto', !visible);
 }
 
+function setOpcionesRutaSoloCancelar(soloCancelar) {
+    const btnAdd = document.getElementById('btn-toggle-add');
+    const btnMostrarPintas = document.getElementById('btn-mostrar-pintas');
+    if (btnAdd) btnAdd.classList.toggle('control-oculto', soloCancelar);
+    if (btnMostrarPintas) btnMostrarPintas.classList.toggle('control-oculto', soloCancelar);
+}
+
+function setOpcionesPintasSoloCancelar(soloCancelar) {
+    const btnAddPintas = document.getElementById('btn-activar-pintas');
+    const btnMostrarRutas = document.getElementById('btn-mostrar-rutas');
+    if (btnAddPintas) btnAddPintas.classList.toggle('control-oculto', soloCancelar);
+    if (btnMostrarRutas) btnMostrarRutas.classList.toggle('control-oculto', soloCancelar);
+}
+
 function mostrarOpcionesPintas(visible) {
     const opciones = document.getElementById('control-pintas-extra');
     if (!opciones) return;
@@ -167,8 +186,8 @@ function bloquearAcciones(activo, origen) {
     const btnMostrarPintas = document.getElementById('btn-mostrar-pintas');
     const btnMostrarRutas = document.getElementById('btn-mostrar-rutas');
     const btnAddPintas = document.getElementById('btn-activar-pintas');
-    if (btnRuta) btnRuta.disabled = activo;
-    if (btnPintas) btnPintas.disabled = activo;
+    if (btnRuta) btnRuta.disabled = activo && origen !== 'ruta';
+    if (btnPintas) btnPintas.disabled = activo && origen !== 'pintas';
     if (btnAmbos) btnAmbos.disabled = activo;
     if (btnAddRuta) btnAddRuta.disabled = activo || origen === 'pintas';
     if (btnMostrarPintas) btnMostrarPintas.disabled = activo;
@@ -221,6 +240,8 @@ function cerrarPanelRutas() {
     limpiarRutasVisibles();
     desactivarModoAgregar();
     setBotonAddHabilitado(true);
+    setOpcionesRutaSoloCancelar(false);
+    setOpcionesPintasSoloCancelar(false);
     panelModo = null;
     pintasDesdeRuta = false;
     rutasDesdePintas = false;
@@ -341,7 +362,8 @@ map.on('click', function(e) {
 
         // Establecer fecha de hoy por defecto
         const hoy = new Date().toISOString().split('T')[0];
-    rutasDesdePintas = true;
+        document.getElementById('fecha').value = hoy;
+        rutasDesdePintas = false;
 
         document.getElementById('nombre-archivo').textContent = 'Ningún archivo seleccionado';
     }
@@ -563,9 +585,9 @@ function formatearDescripcionUbicacion(descripcion, lat, lng, direccion) {
     return partes.filter(Boolean).join(' | ');
 }
 
-function formatearDescripcionRuta(descripcion, inicio, fin, dirInicio, dirFin, indice) {
+function formatearDescripcionRuta(descripcion, inicio, dirInicio) {
     const inicioFmt = `${Number(inicio.lat).toFixed(6)}, ${Number(inicio.lng).toFixed(6)}`;
-    const partes = [`${descripcion} (${indice + 1})`];
+    const partes = [descripcion || 'Ruta sin descripcion'];
     if (dirInicio) {
         partes.push(`Direccion: ${dirInicio}`);
     }
@@ -762,22 +784,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else {
                             const puntosRuta = obtenerWaypointsTemporal();
                             const inicioRuta = puntosRuta[0];
-                            const finRuta = puntosRuta[puntosRuta.length - 1];
                             const dirInicio = inicioRuta ? await obtenerDireccion(inicioRuta.lat, inicioRuta.lng) : '';
-                            const dirFin = finRuta ? await obtenerDireccion(finRuta.lat, finRuta.lng) : '';
-                            for (let index = 0; index < puntosRuta.length; index += 1) {
-                                const punto = puntosRuta[index];
+                            if (inicioRuta) {
                                 const descripcionFinal = formatearDescripcionRuta(
                                     descripcion,
                                     inicioRuta,
-                                    finRuta,
-                                    dirInicio,
-                                    dirFin,
-                                    index
+                                    dirInicio
                                 );
                                 agregarRutaLocal(
-                                    punto.lat,
-                                    punto.lng,
+                                    inicioRuta.lat,
+                                    inicioRuta.lng,
                                     descripcionFinal,
                                     fecha
                                 );
@@ -827,32 +843,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     const puntosRuta = obtenerWaypointsTemporal();
                     const inicioRuta = puntosRuta[0];
-                    const finRuta = puntosRuta[puntosRuta.length - 1];
                     const dirInicio = inicioRuta ? await obtenerDireccion(inicioRuta.lat, inicioRuta.lng) : '';
-                    const dirFin = finRuta ? await obtenerDireccion(finRuta.lat, finRuta.lng) : '';
-                    const payloads = [];
-                    for (let index = 0; index < puntosRuta.length; index += 1) {
-                        const punto = puntosRuta[index];
-                        const descripcionFinal = formatearDescripcionRuta(
-                            descripcion,
-                            inicioRuta,
-                            finRuta,
-                            dirInicio,
-                            dirFin,
-                            index
-                        );
-                        const payload = {
-                            ...payloadBase,
-                            latitud: punto.lat,
-                            longitud: punto.lng,
-                            descripcion: descripcionFinal
-                        };
-                        if (urlFinal) {
-                            payload.foto_url = urlFinal;
-                        }
-                        payloads.push(payload);
+                    const descripcionFinal = formatearDescripcionRuta(
+                        descripcion,
+                        inicioRuta,
+                        dirInicio
+                    );
+                    const payload = {
+                        ...payloadBase,
+                        latitud: inicioRuta.lat,
+                        longitud: inicioRuta.lng,
+                        descripcion: descripcionFinal
+                    };
+                    if (urlFinal) {
+                        payload.foto_url = urlFinal;
                     }
-                    ({ error: insertError } = await _supabase.from(tablaDestino).insert(payloads));
+                    ({ error: insertError } = await _supabase.from(tablaDestino).insert([payload]));
                 }
 
                 if (!insertError) {
@@ -988,21 +994,27 @@ function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona
 
 // Función para dibujar/ocultar la ruta
 function toggleRuta() {
-    if (modoAgregarPintas || modoAgregarRuta) {
+    if (modoAgregarPintas) {
+        return;
+    }
+    if (modoAgregarRuta) {
+        cancelarRuta();
         return;
     }
     if (!puntosRutaAprobados) {
         return;
     }
 
-    if (panelModo === 'ambos') {
+    const veniaDeAmbos = panelModo === 'ambos';
+
+    if (veniaDeAmbos) {
         panelModo = null;
         setBotonAmbosTexto(false);
         mostrarPintasMapa(false);
         limpiarCapasRutas();
     }
 
-    const hayRutasVisibles = rutaVisible || controlesRutasVisibles.length > 0 || marcadoresNumeros.length > 0;
+    const hayRutasVisibles = !veniaDeAmbos && (rutaVisible || controlesRutasVisibles.length > 0 || marcadoresNumeros.length > 0);
     if (hayRutasVisibles) {
         limpiarRutasVisibles();
         desactivarModoAgregar();
@@ -1078,8 +1090,8 @@ function toggleAmbos() {
     rutasDesdePintas = false;
     setPanelInfo('Rutas y Pintas', 'Rutas y pintas visibles.');
     setPanelListaVisible('ambos');
-    setBotonRuta(true);
-    setBotonPintas(true);
+    setBotonRuta(false);
+    setBotonPintas(false);
     mostrarOpcionesRuta(false);
     mostrarOpcionesPintas(false);
     setBotonesPrincipalesVisible(true, true);
@@ -1095,6 +1107,10 @@ function toggleAmbos() {
 
 function togglePintas() {
     if (modoAgregarRuta) {
+        return;
+    }
+    if (modoAgregarPintas) {
+        cancelarAgregarPintas();
         return;
     }
     const panel = document.getElementById('panel-puntos');
@@ -1165,6 +1181,7 @@ function mostrarPintasDesdeRuta() {
         setBotonMostrarPintas(false);
         setCancelarRutaTopVisible(true, 'Salir');
         rutasDesdePintas = false;
+        actualizarVisibilidadPintas();
         return;
     }
 
@@ -1174,7 +1191,7 @@ function mostrarPintasDesdeRuta() {
     mostrarOpcionesPintas(false);
     setBotonMostrarPintas(true);
     setCancelarRutaTopVisible(true, 'Salir');
-    mostrarPintasMapa(true);
+    actualizarVisibilidadPintas();
     rutasDesdePintas = false;
     renderListaPintas();
 }
@@ -1188,6 +1205,7 @@ function activarModoAgregarPintas() {
     bloquearAcciones(true, 'pintas');
     setBotonPintas(true);
     mostrarOpcionesPintas(true);
+    setOpcionesPintasSoloCancelar(true);
     setBotonesPrincipalesVisible(false, true);
     setBotonMostrarPintas(false);
     setCancelarRutaTopVisible(false, 'Cancelar');
@@ -1202,6 +1220,7 @@ function activarModoAgregarPintas() {
 
 function cancelarAgregarPintas() {
     modoAgregarPintas = false;
+    setOpcionesPintasSoloCancelar(false);
     bloquearAcciones(false);
     const volverPintas = modoAnterior === 'pintas';
     if (volverPintas) {
@@ -1315,7 +1334,12 @@ function construirRutaSeleccionada() {
     });
 
     rutaVisible = controlesRutasVisibles.length > 0;
-    setBotonRuta(rutaVisible);
+    if (panelModo === 'ambos') {
+        setBotonRuta(false);
+        setBotonPintas(false);
+    } else {
+        setBotonRuta(rutaVisible);
+    }
     if (!rutaVisible) {
         ocultarPanelRutas();
         setBotonAddHabilitado(true);
@@ -1340,9 +1364,11 @@ function toggleModoAgregar() {
         modoAgregarPintas = false;
         panelModo = 'rutas';
         pintasDesdeRuta = false;
-        mostrarOpcionesRuta(false);
+        mostrarOpcionesRuta(true);
+        setOpcionesRutaSoloCancelar(true);
         mostrarOpcionesPintas(false);
-        setBotonesPrincipalesVisible(false, false);
+        setBotonesPrincipalesVisible(true, false);
+        setBotonRuta(true);
         setBotonMostrarPintas(false);
         setCancelarRutaTopVisible(true, 'Cancelar');
         setCancelarPintasTexto('Cancelar');
@@ -1351,7 +1377,9 @@ function toggleModoAgregar() {
         btnAdd.classList.remove('activo');
         btnAdd.textContent = 'Añadir ruta';
         bloquearAcciones(false);
-        setBotonesPrincipalesVisible(false, false);
+        setOpcionesRutaSoloCancelar(false);
+        setBotonesPrincipalesVisible(true, false);
+        setBotonRuta(true);
         setBotonMostrarPintas(false);
         mostrarOpcionesRuta(true);
         setCancelarRutaTopVisible(true, 'Salir');
@@ -1363,6 +1391,7 @@ function toggleModoAgregar() {
 
 function desactivarModoAgregar() {
     modoAgregarRuta = false;
+    setOpcionesRutaSoloCancelar(false);
     const btnAdd = document.getElementById('btn-toggle-add');
     if (btnAdd) {
         btnAdd.classList.remove('activo');
@@ -1539,6 +1568,7 @@ function aceptarRuta() {
 function cancelarRuta() {
     if (modoAgregarRuta) {
         modoAgregarRuta = false;
+        setOpcionesRutaSoloCancelar(false);
         resetRutaTemporal();
         bloquearAcciones(false);
         panelModo = 'rutas';
@@ -1550,7 +1580,7 @@ function cancelarRuta() {
         setPanelListaVisible('rutas');
         mostrarOpcionesRuta(true);
         mostrarOpcionesPintas(false);
-        setBotonesPrincipalesVisible(false, false);
+        setBotonesPrincipalesVisible(true, false);
         setBotonRuta(true);
         setBotonPintas(false);
         setBotonMostrarPintas(false);
@@ -1649,3 +1679,4 @@ function mostrarRutasDesdePintas() {
     setBotonMostrarRutas(true);
     construirRutaSeleccionada();
 }
+
