@@ -13,17 +13,35 @@
 </head>
 <body>
 
-    <!-- Botón para mostrar/ocultar ruta -->
+    <!-- Controles de ruta -->
     <div id="control-ruta">
-        <button id="btn-toggle-ruta" onclick="toggleRuta()">
-            <span id="icono-ruta">🗺️</span> <span id="texto-ruta">Mostrar Ruta</span>
-        </button>
+        <div class="ruta-botones">
+            <button id="btn-toggle-ruta" onclick="toggleRuta()">Ruta</button>
+            <button id="btn-cancelar-ruta-top" class="control-oculto" onclick="cancelarRuta()">Cancelar</button>
+            <button id="btn-toggle-pintas" onclick="togglePintas()">Pintas</button>
+        </div>
+        <div id="control-ruta-opciones" class="control-oculto">
+            <button id="btn-toggle-add" onclick="toggleModoAgregar()">Añadir ruta</button>
+            <button id="btn-mostrar-pintas" onclick="mostrarPintasDesdeRuta()">Mostrar pintas</button>
+        </div>
+        <div id="control-pintas-extra" class="control-oculto">
+            <button id="btn-activar-pintas" onclick="activarModoAgregarPintas()">Añadir pintas</button>
+            <button id="btn-cancelar-pintas" onclick="cancelarAgregarPintas()">Cancelar</button>
+        </div>
+        <div id="control-ruta-extra">
+            <button id="btn-aceptar-ruta" onclick="aceptarRuta()">Aceptar</button>
+            <button id="btn-cancelar-ruta" onclick="cancelarRuta()">Cancelar</button>
+        </div>
     </div>
 
     <!-- Lista de puntos para la ruta -->
     <div id="panel-puntos">
-        <div class="panel-titulo">Puntos de la Ruta</div>
-        <div id="lista-puntos"></div>
+        <div class="panel-header">
+            <div class="panel-titulo">Puntos de la Ruta</div>
+            <button id="btn-cerrar-rutas" type="button" onclick="cerrarPanelRutas()" aria-label="Cerrar">×</button>
+        </div>
+        <div id="lista-rutas"></div>
+        <div id="lista-pintas" class="lista-oculta"></div>
         <div class="panel-ayuda">Desmarca los puntos que no quieras incluir.</div>
     </div>
 
@@ -41,13 +59,13 @@
     <div id="modal-formulario" class="modal-overlay" style="display:none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Registrar Nueva Zona</h2>
+                <h2 id="modal-titulo">Registrar Nueva Zona</h2>
                 <button type="button" class="modal-close" onclick="cerrarModal()" title="Cerrar">&times;</button>
             </div>
             
             <form id="formulario-zona">
                 <div class="form-group">
-                    <label for="descripcion">Descripción de la Zona:</label>
+                    <label for="descripcion" id="label-descripcion">Descripción de la Zona:</label>
                     <input type="text" id="descripcion" placeholder="Ej: Parque central, esquina" required>
                 </div>
 
@@ -56,7 +74,7 @@
                     <input type="date" id="fecha" required>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="grupo-tipo">
                     <label for="tipoAnuncio">Tipo de Anuncio:</label>
                     <select id="tipoAnuncio" required>
                         <option value="">Selecciona una opción</option>
@@ -68,14 +86,14 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="persona">Promotor:</label>
+                    <label for="persona" id="label-persona">Promotor:</label>
                     <input type="text" id="persona" placeholder="Tu nombre completo" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="foto">Seleccionar Imagen:</label>
+                    <label for="foto" id="label-foto">Seleccionar Imagen:</label>
                     <div class="file-input-wrapper">
-                        <input type="file" id="foto" accept="image/*" required>
+                        <input type="file" id="foto" accept="image/*">
                         <span id="nombre-archivo">Ningún archivo seleccionado</span>
                     </div>
                 </div>
