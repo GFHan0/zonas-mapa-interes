@@ -21,6 +21,41 @@ body {
     top: 20px;
     right: 20px;
     z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.ruta-botones {
+    display: flex;
+    gap: 8px;
+}
+
+.control-oculto {
+    display: none !important;
+}
+
+#control-ruta-opciones,
+#control-pintas-extra {
+    display: flex;
+    gap: 8px;
+}
+
+#control-ruta-extra {
+    display: none;
+    gap: 8px;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#control-ruta-extra.ruta-extra-visible {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 #panel-puntos {
@@ -50,17 +85,51 @@ body {
     pointer-events: auto;
 }
 
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
 .panel-titulo {
     font-weight: bold;
     color: #27ae60;
     font-size: 1em;
 }
 
-#lista-puntos {
+#btn-cerrar-rutas {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: #e74c3c;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+#btn-cerrar-rutas:hover {
+    background: #cf3f33;
+    transform: translateY(-1px);
+}
+
+#lista-rutas,
+#lista-pintas {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.lista-oculta {
+    display: none;
 }
 
 .punto-item {
@@ -97,32 +166,154 @@ body {
 }
 
 #btn-toggle-ruta {
-    background: #27ae60;
+    background: #7f8c8d;
     color: white;
     border: none;
-    padding: 12px 20px;
-    border-radius: 25px;
-    font-size: 1em;
-    font-weight: bold;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-#btn-toggle-ruta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+#btn-toggle-add {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-#btn-toggle-ruta:active {
-    transform: translateY(0);
+#btn-mostrar-pintas {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-#icono-ruta {
-    font-size: 1.2em;
+#btn-activar-pintas {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#btn-cancelar-pintas {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#btn-toggle-pintas {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#btn-toggle-add.activo {
+    background: #6c7a7b;
+}
+
+#btn-toggle-add:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+#btn-toggle-ruta:hover,
+#btn-toggle-add:hover,
+#btn-toggle-pintas:hover,
+#btn-mostrar-pintas:hover,
+#btn-activar-pintas:hover,
+#btn-cancelar-pintas:hover,
+#btn-aceptar-ruta:hover,
+#btn-cancelar-ruta:hover {
+    transform: translateY(-1px);
+}
+
+#btn-toggle-ruta:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+#btn-toggle-pintas:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+#btn-toggle-add:disabled,
+#btn-mostrar-pintas:disabled,
+#btn-activar-pintas:disabled,
+#btn-cancelar-pintas:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+#btn-aceptar-ruta,
+#btn-cancelar-ruta {
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#btn-aceptar-ruta {
+    background: #7f8c8d;
+    color: white;
+}
+
+#btn-cancelar-ruta {
+    background: #7f8c8d;
+    color: white;
+}
+
+#btn-cancelar-ruta-top {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+#control-ruta button:hover {
+    background: #6c7a7b;
 }
 
 /* =========================================
