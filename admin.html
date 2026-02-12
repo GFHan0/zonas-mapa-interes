@@ -43,6 +43,10 @@
 <div class="container">
     <h1>Validacion de Pintas</h1>
     <p style="text-align: center; color: #aaa;">Gestiona los reportes recibidos desde el mapa.</p>
+    <p style="text-align: center; margin: 10px 0 0;">
+        <button class="btn btn-aprobar" onclick="descargarCsvPintas()">Descargar CSV Pintas</button>
+        <button class="btn btn-aprobar" onclick="descargarCsvPintasAprobadas()">Descargar CSV Pintas Aprobadas</button>
+    </p>
     <table>
         <thead>
             <tr>
@@ -57,6 +61,10 @@
 
     <h1 style="margin-top: 40px;">Validacion de Rutas</h1>
     <p style="text-align: center; color: #aaa;">Gestiona los registros de rutas.</p>
+    <p style="text-align: center; margin: 10px 0 0;">
+        <button class="btn btn-aprobar" onclick="descargarCsvRutas()">Descargar CSV Rutas</button>
+        <button class="btn btn-aprobar" onclick="descargarCsvRutasAprobadas()">Descargar CSV Rutas Aprobadas</button>
+    </p>
     <table>
         <thead>
             <tr>
@@ -178,31 +186,241 @@
         tbody.innerHTML = "";
 
         if (data) {
+            const grupos = {};
+
             data.forEach(r => {
-                const foto = r.foto_url ? `<img src="${r.foto_url}" width="60" height="60" title="Pasa el mouse para ampliar">` : '<i>Sin foto</i>';
-                const titulo = r.descripcion || "Ruta sin descripcion";
-                const sublinea = `<br><small style="color:#bbb;">Subido por: <b>${r.nombre_persona || 'Anonimo'}</b> | Fecha: ${r.fecha_registro || 'N/A'}</small>`;
-                const motivoRechazo = r.mensaje_adm ? `<br><small style="color:#ff9f43;">Nota Admin: ${r.mensaje_adm}</small>` : '';
+                const baseRaw = obtenerDescripcionBase(r.descripcion);
+                const baseKey = normalizarTexto(baseRaw);
+                const fecha = (r.fecha_registro || '').trim();
+                const clave = `${baseKey}||${fecha}`;
+                if (!grupos[clave]) {
+                    grupos[clave] = {
+                        descripcion: baseRaw || 'Ruta sin descripcion',
+                        fecha,
+                        ids: [],
+                        estados: new Set(),
+                        foto_url: r.foto_url || null,
+                        nombre_persona: r.nombre_persona || 'Anonimo',
+                        mensaje_adm: r.mensaje_adm || ''
+                    };
+                }
+                grupos[clave].ids.push(r.id);
+                grupos[clave].estados.add(r.estado);
+                if (!grupos[clave].foto_url && r.foto_url) {
+                    grupos[clave].foto_url = r.foto_url;
+                }
+                if (!grupos[clave].mensaje_adm && r.mensaje_adm) {
+                    grupos[clave].mensaje_adm = r.mensaje_adm;
+                }
+            });
+
+            Object.values(grupos).forEach(grupo => {
+                const idsJson = JSON.stringify(grupo.ids);
+                const foto = grupo.foto_url ? `<img src="${grupo.foto_url}" width="60" height="60" title="Pasa el mouse para ampliar">` : '<i>Sin foto</i>';
+                const estadoFinal = obtenerEstadoGrupo(grupo.estados);
+                const sublinea = `<br><small style="color:#bbb;">Subido por: <b>${grupo.nombre_persona}</b> | Fecha: ${grupo.fecha || 'N/A'} | Puntos: ${grupo.ids.length}</small>`;
+                const motivoRechazo = grupo.mensaje_adm ? `<br><small style="color:#ff9f43;">Nota Admin: ${grupo.mensaje_adm}</small>` : '';
 
                 tbody.innerHTML += `
                     <tr>
                         <td>${foto}</td>
                         <td>
-                            <span style="color:#27ae60; font-weight:bold; font-size:1.1em;">${titulo}</span>
+                            <span style="color:#27ae60; font-weight:bold; font-size:1.1em;">${grupo.descripcion}</span>
                             ${sublinea}
                             ${motivoRechazo}
                         </td>
-                        <td><span class="badge ${r.estado}">${r.estado}</span></td>
+                        <td><span class="badge ${estadoFinal}">${estadoFinal}</span></td>
                         <td>
-                            ${r.estado === 'pendiente' ? `<button class="btn btn-aprobar" onclick="actualizarRuta(${r.id}, 'aprobado')">Aprobar ✅</button>` : ''}
-                            <button class="btn btn-aprobar" onclick="editarRuta(${r.id})">Editar ✏️</button>
-                            <button class="btn btn-rechazar" onclick="rechazarRuta(${r.id})">Rechazar ✖</button>
-                            <button class="btn btn-eliminar" onclick="eliminarRuta(${r.id})">Eliminar 🗑</button>
+                            ${estadoFinal === 'pendiente' ? `<button class="btn btn-aprobar" onclick='actualizarRutaGrupo(${idsJson}, "aprobado")'>Aprobar ✅</button>` : ''}
+                            <button class="btn btn-aprobar" onclick='editarRutaGrupo(${idsJson})'>Editar ✏️</button>
+                            <button class="btn btn-rechazar" onclick='rechazarRutaGrupo(${idsJson})'>Rechazar ✖</button>
+                            <button class="btn btn-eliminar" onclick='eliminarRutaGrupo(${idsJson})'>Eliminar 🗑</button>
                         </td>
                     </tr>
                 `;
             });
         }
+    }
+
+    function obtenerDescripcionBase(descripcion) {
+        const texto = descripcion || '';
+        const partes = texto.split(/ \| (Coord|Inicio|Punto inicio|Direccion|Coordenada):/);
+        return partes[0].replace(/\s*\(\d+\)\s*$/, '').trim();
+    }
+
+    function normalizarTexto(texto) {
+        return String(texto || '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function obtenerEstadoGrupo(estados) {
+        if (estados.has('pendiente')) return 'pendiente';
+        if (estados.has('rechazado')) return 'rechazado';
+        return 'aprobado';
+    }
+
+    function getCsvColumns(rows, preferredColumns) {
+        const columnas = [];
+        const agregadas = new Set();
+
+        preferredColumns.forEach((col) => {
+            if (rows.some((row) => Object.prototype.hasOwnProperty.call(row, col))) {
+                columnas.push(col);
+                agregadas.add(col);
+            }
+        });
+
+        rows.forEach((row) => {
+            Object.keys(row).forEach((col) => {
+                if (!agregadas.has(col)) {
+                    columnas.push(col);
+                    agregadas.add(col);
+                }
+            });
+        });
+
+        return columnas;
+    }
+
+    function convertirACsv(rows, columns) {
+        const escapeValue = (value) => {
+            if (value === null || value === undefined) return '';
+            const texto = String(value);
+            if (/[",\n\r]/.test(texto)) {
+                return `"${texto.replace(/"/g, '""')}"`;
+            }
+            return texto;
+        };
+
+        const header = columns.map(escapeValue).join(',');
+        const body = rows.map((row) => columns.map((col) => escapeValue(row[col])).join(','));
+        return [header, ...body].join('\r\n');
+    }
+
+    function descargarArchivo(nombre, contenido) {
+        const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nombre;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    async function descargarCsvPintas() {
+        const { data, error } = await _supabase
+            .from('puntos')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            alert(error.message);
+            return;
+        }
+
+        const filas = data || [];
+        const columnas = getCsvColumns(filas, [
+            'id',
+            'descripcion',
+            'nombre_persona',
+            'tipo_anuncio',
+            'fecha_registro',
+            'latitud',
+            'longitud',
+            'foto_url',
+            'estado',
+            'mensaje_adm'
+        ]);
+        const csv = convertirACsv(filas, columnas);
+        descargarArchivo('pintas.csv', csv);
+    }
+
+    async function descargarCsvPintasAprobadas() {
+        const { data, error } = await _supabase
+            .from('puntos')
+            .select('*')
+            .eq('estado', 'aprobado')
+            .order('id', { ascending: false });
+
+        if (error) {
+            alert(error.message);
+            return;
+        }
+
+        const filas = data || [];
+        const columnas = getCsvColumns(filas, [
+            'id',
+            'descripcion',
+            'nombre_persona',
+            'tipo_anuncio',
+            'fecha_registro',
+            'latitud',
+            'longitud',
+            'foto_url',
+            'estado',
+            'mensaje_adm'
+        ]);
+        const csv = convertirACsv(filas, columnas);
+        descargarArchivo('pintas_aprobadas.csv', csv);
+    }
+
+    async function descargarCsvRutas() {
+        const { data, error } = await _supabase
+            .from('rutas')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            alert(error.message);
+            return;
+        }
+
+        const filas = data || [];
+        const columnas = getCsvColumns(filas, [
+            'id',
+            'descripcion',
+            'nombre_persona',
+            'fecha_registro',
+            'latitud',
+            'longitud',
+            'foto_url',
+            'estado',
+            'mensaje_adm'
+        ]);
+        const csv = convertirACsv(filas, columnas);
+        descargarArchivo('rutas.csv', csv);
+    }
+
+    async function descargarCsvRutasAprobadas() {
+        const { data, error } = await _supabase
+            .from('rutas')
+            .select('*')
+            .eq('estado', 'aprobado')
+            .order('id', { ascending: false });
+
+        if (error) {
+            alert(error.message);
+            return;
+        }
+
+        const filas = data || [];
+        const columnas = getCsvColumns(filas, [
+            'id',
+            'descripcion',
+            'nombre_persona',
+            'fecha_registro',
+            'latitud',
+            'longitud',
+            'foto_url',
+            'estado',
+            'mensaje_adm'
+        ]);
+        const csv = convertirACsv(filas, columnas);
+        descargarArchivo('rutas_aprobadas.csv', csv);
     }
 
     async function actualizar(id, nuevoEstado) {
@@ -213,6 +431,12 @@
 
     async function actualizarRuta(id, nuevoEstado) {
         const { error } = await _supabase.from('rutas').update({ estado: nuevoEstado }).eq('id', id);
+        if (error) alert(error.message);
+        cargarRutas();
+    }
+
+    async function actualizarRutaGrupo(ids, nuevoEstado) {
+        const { error } = await _supabase.from('rutas').update({ estado: nuevoEstado }).in('id', ids);
         if (error) alert(error.message);
         cargarRutas();
     }
@@ -293,6 +517,44 @@
         cargarRutas();
     }
 
+    async function editarRutaGrupo(ids) {
+        const { data, error } = await _supabase
+            .from('rutas')
+            .select('descripcion, nombre_persona, fecha_registro')
+            .in('id', ids)
+            .order('id', { ascending: true })
+            .limit(1);
+
+        if (error || !data || !data[0]) {
+            alert('No se pudo cargar el registro');
+            return;
+        }
+
+        const baseDescripcion = obtenerDescripcionBase(data[0].descripcion);
+        const nuevaDescripcion = prompt('Direccion de la ruta:', baseDescripcion || '');
+        if (nuevaDescripcion === null) return;
+
+        const nuevoPromotor = prompt('Nombre de quien lo sube:', data[0].nombre_persona || '');
+        if (nuevoPromotor === null) return;
+
+        const nuevaFecha = prompt('Fecha (YYYY-MM-DD):', data[0].fecha_registro || '');
+        if (nuevaFecha === null) return;
+
+        const { error: updateError } = await _supabase
+            .from('rutas')
+            .update({
+                descripcion: nuevaDescripcion,
+                nombre_persona: nuevoPromotor,
+                fecha_registro: nuevaFecha
+            })
+            .in('id', ids);
+
+        if (updateError) {
+            alert(updateError.message);
+        }
+        cargarRutas();
+    }
+
     async function rechazar(id) {
         const motivo = prompt("Motivo del rechazo:");
         if (!motivo) return;
@@ -319,6 +581,19 @@
         cargarRutas();
     }
 
+    async function rechazarRutaGrupo(ids) {
+        const motivo = prompt("Motivo del rechazo:");
+        if (!motivo) return;
+
+        const { error } = await _supabase
+            .from('rutas')
+            .update({ estado: 'rechazado', mensaje_adm: motivo })
+            .in('id', ids);
+
+        if (error) alert(error.message);
+        cargarRutas();
+    }
+
     async function eliminar(id) {
         if (confirm("¿Estás seguro de eliminar permanentemente este registro?")) {
             const { error } = await _supabase.from('puntos').delete().eq('id', id);
@@ -330,6 +605,14 @@
     async function eliminarRuta(id) {
         if (confirm("¿Estás seguro de eliminar permanentemente este registro?")) {
             const { error } = await _supabase.from('rutas').delete().eq('id', id);
+            if (error) alert(error.message);
+            cargarRutas();
+        }
+    }
+
+    async function eliminarRutaGrupo(ids) {
+        if (confirm("¿Estás seguro de eliminar permanentemente esta ruta?")) {
+            const { error } = await _supabase.from('rutas').delete().in('id', ids);
             if (error) alert(error.message);
             cargarRutas();
         }
