@@ -121,6 +121,23 @@ function setBotonRuta(visible) {
         return;
     }
     btnRuta.textContent = visible ? 'Salir' : 'Rutas';
+    // Al hacer visible=true, el botón dice 'Salir'.
+    // Si el usuario presiona 'Salir', debe volver a la vista principal de botones.
+    btnRuta.onclick = function() {
+        if (btnRuta.textContent === 'Salir') {
+            // Restaurar vista principal
+            setBotonRuta(false);
+            setBotonPintas(false);
+            setBotonAmbosVisible(true);
+            mostrarOpcionesRuta(false);
+            mostrarOpcionesPintas(false);
+            setBotonesPrincipalesVisible(true, true);
+            setPanelVisible(false);
+            panelModo = null;
+        } else {
+            toggleRuta();
+        }
+    };
 }
 
 function setBotonPintas(visible) {
@@ -1032,10 +1049,7 @@ function toggleRuta() {
         setCancelarRutaTopVisible(false, 'Cancelar');
         actualizarVisibilidadPintas();
     } else {
-        const panel = document.getElementById('panel-puntos');
-        if (panel) {
-            panel.classList.add('panel-visible');
-        }
+        setPanelVisible(false);
         panelModo = 'rutas';
         pintasDesdeRuta = false;
         rutasDesdePintas = false;
@@ -1443,6 +1457,7 @@ function manejarClicksRuta(ubicacion) {
     if (rutaPuntosTemporales.length >= 2) {
         rutaListaTemporal = true;
         mostrarAccionesRuta(true);
+        setBotonesPrincipalesVisible(false, false);
         const btnAdd = document.getElementById('btn-toggle-add');
         if (btnAdd) {
             btnAdd.disabled = true;
@@ -1569,14 +1584,17 @@ function cancelarRuta() {
     if (modoAgregarRuta) {
         modoAgregarRuta = false;
         setOpcionesRutaSoloCancelar(false);
+        const btnAdd = document.getElementById('btn-toggle-add');
+        if (btnAdd) {
+            btnAdd.classList.remove('activo');
+            btnAdd.textContent = 'Añadir ruta';
+            btnAdd.disabled = false;
+        }
         resetRutaTemporal();
         bloquearAcciones(false);
         panelModo = 'rutas';
         pintasDesdeRuta = false;
-        const panel = document.getElementById('panel-puntos');
-        if (panel) {
-            panel.classList.add('panel-visible');
-        }
+        setPanelVisible(false);
         setPanelListaVisible('rutas');
         mostrarOpcionesRuta(true);
         mostrarOpcionesPintas(false);
