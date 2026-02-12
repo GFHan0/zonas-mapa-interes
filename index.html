@@ -17,16 +17,18 @@
     <div id="control-ruta">
         <div class="ruta-botones">
             <button id="btn-toggle-ruta" onclick="toggleRuta()">Ruta</button>
-            <button id="btn-cancelar-ruta-top" class="control-oculto" onclick="cancelarRuta()">Cancelar</button>
             <button id="btn-toggle-pintas" onclick="togglePintas()">Pintas</button>
+            <button id="btn-toggle-ambos" onclick="toggleAmbos()">Mostrar ambos</button>
         </div>
         <div id="control-ruta-opciones" class="control-oculto">
             <button id="btn-toggle-add" onclick="toggleModoAgregar()">Añadir ruta</button>
             <button id="btn-mostrar-pintas" onclick="mostrarPintasDesdeRuta()">Mostrar pintas</button>
+            <button id="btn-cancelar-ruta-top" class="control-oculto" onclick="cancelarRuta()">Salir</button>
         </div>
         <div id="control-pintas-extra" class="control-oculto">
             <button id="btn-activar-pintas" onclick="activarModoAgregarPintas()">Añadir pintas</button>
-            <button id="btn-cancelar-pintas" onclick="cancelarAgregarPintas()">Cancelar</button>
+            <button id="btn-mostrar-rutas" onclick="mostrarRutasDesdePintas()">Mostrar rutas</button>
+            <button id="btn-cancelar-pintas" onclick="cancelarAgregarPintas()">Salir</button>
         </div>
         <div id="control-ruta-extra">
             <button id="btn-aceptar-ruta" onclick="aceptarRuta()">Aceptar</button>
@@ -37,12 +39,12 @@
     <!-- Lista de puntos para la ruta -->
     <div id="panel-puntos">
         <div class="panel-header">
-            <div class="panel-titulo">Puntos de la Ruta</div>
+            <div class="panel-titulo">Rutas</div>
             <button id="btn-cerrar-rutas" type="button" onclick="cerrarPanelRutas()" aria-label="Cerrar">×</button>
         </div>
         <div id="lista-rutas"></div>
         <div id="lista-pintas" class="lista-oculta"></div>
-        <div class="panel-ayuda">Desmarca los puntos que no quieras incluir.</div>
+        <div class="panel-ayuda">Desmarca las rutas que no quieras incluir.</div>
     </div>
 
     <div id="map"></div>
