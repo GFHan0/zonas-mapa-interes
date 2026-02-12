@@ -437,17 +437,41 @@ async function cargarRutasAprobadas() {
     if (error) return;
     if (data) {
         const rutasOrdenadas = [];
+        const grupos = {};
 
         data.forEach(r => {
-            if (r.estado === 'aprobado') {
+            const estado = normalizarEstado(r.estado);
+            const base = obtenerDescripcionBase(r.descripcion);
+            const fecha = r.fecha_registro || '';
+            const clave = `${base}|${fecha}`;
+            if (!grupos[clave]) {
+                grupos[clave] = {
+                    puntos: [],
+                    estados: new Set()
+                };
+            }
+            grupos[clave].puntos.push(r);
+            grupos[clave].estados.add(estado);
+        });
+
+        Object.values(grupos).forEach((grupo) => {
+            if (!grupo.estados.has('aprobado')) {
+                return;
+            }
+            grupo.puntos.forEach((r) => {
+                const lat = normalizarNumero(r.latitud);
+                const lng = normalizarNumero(r.longitud);
+                if (lat === null || lng === null) {
+                    return;
+                }
                 rutasOrdenadas.push({
                     id: r.id,
-                    lat: r.latitud,
-                    lng: r.longitud,
+                    lat,
+                    lng,
                     fecha: r.fecha_registro,
                     descripcion: r.descripcion
                 });
-            }
+            });
         });
 
         // Ordenar rutas por fecha
@@ -478,6 +502,10 @@ function normalizarNumero(valor) {
     if (!texto) return null;
     const numero = Number(texto);
     return Number.isFinite(numero) ? numero : null;
+}
+
+function normalizarEstado(estado) {
+    return String(estado || '').trim().toLowerCase();
 }
 
 function obtenerDescripcionBase(descripcion) {
@@ -623,7 +651,7 @@ document.addEventListener('change', function(e) {
                 grupo.ids.forEach((id) => puntosSeleccionados.delete(id));
             }
         }
-        if (rutaVisible) {
+        if (panelModo === 'rutas' || panelModo === 'ambos' || rutasDesdePintas) {
             construirRutaSeleccionada();
         }
     }
@@ -1211,7 +1239,6 @@ function cancelarAgregarPintas() {
     setBotonMostrarPintas(false);
     setBotonMostrarRutas(rutasDesdePintas);
     setCancelarRutaTopVisible(false, 'Cancelar');
-    setCancelarPintasTexto(volverPintas ? 'Salir' : 'Cancelar');
 }
 
 function construirRutaSeleccionada() {
@@ -1237,7 +1264,6 @@ function construirRutaSeleccionada() {
         if (grupo.length < 2) {
             return;
         }
-        setCancelarPintasTexto(volverPintas ? 'Salir' : 'Cancelar');
         const descripcionRuta = normalizarDescripcionRuta(grupo[0].descripcion);
         const fechaRuta = grupo[0].fecha || '';
         const popupHtml = `<div style="text-align:center;">
