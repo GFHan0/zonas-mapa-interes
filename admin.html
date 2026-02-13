@@ -194,13 +194,26 @@
             const grupos = {};
 
             data.forEach(r => {
-                const baseRaw = obtenerDescripcionBase(r.descripcion);
-                const baseKey = normalizarTexto(baseRaw);
+                // Buscar token de grupo en la descripcion (ej: "| Grupo:123456789")
+                const groupMatch = (r.descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+                let clave;
+                let descripcionMostrar = obtenerDescripcionBase(r.descripcion);
                 const fecha = (r.fecha_registro || '').trim();
-                const clave = `${baseKey}||${fecha}`;
+
+                if (groupMatch) {
+                    const token = groupMatch[1];
+                    clave = `GROUP_${token}`;
+                    // Limpiar la descripcion para mostrar (remover el sufijo Grupo)
+                    descripcionMostrar = (r.descripcion || '').replace(/\|\s*Grupo\s*:\s*\d+/i, '').trim();
+                    descripcionMostrar = obtenerDescripcionBase(descripcionMostrar);
+                } else {
+                    const baseKey = normalizarTexto(descripcionMostrar);
+                    clave = `${baseKey}||${fecha}`;
+                }
+
                 if (!grupos[clave]) {
                     grupos[clave] = {
-                        descripcion: baseRaw || 'Ruta sin descripcion',
+                        descripcion: descripcionMostrar || 'Ruta sin descripcion',
                         fecha,
                         ids: [],
                         estados: new Set(),
