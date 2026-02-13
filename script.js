@@ -3,6 +3,9 @@ const SUPABASE_URL = 'https://jwtruolnvepievxheuyh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_8QmGDNmTJSCnnQT22-SSBA_9UFzR0YN';
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SUPABASE_ENABLED = true;
+// Si true, dibuja la ruta exactamente siguiendo los puntos marcados (polyline).
+// Si false, intentará usar Leaflet Routing Machine para enrutamiento por vías.
+const PREFER_MARKED_PATH = true;
 const DEMO_RUTAS = [
     {
         id: 101,
@@ -98,6 +101,8 @@ let marcadorInicioTemporal = null;
 let marcadorFinTemporal = null;
 let rutaGruposActuales = {};
 let pintasRegistradas = [];
+// Referencias de puntos marcados en el cliente para cada ruta (grupoToken -> array de {lat,lng})
+let rutaReferencias = {};
 let panelModo = null;
 let modoAgregarPintas = false;
 let pintasVisibles = false;
@@ -125,6 +130,9 @@ function setBotonRuta(visible) {
     // Si el usuario presiona 'Salir', debe volver a la vista principal de botones.
     btnRuta.onclick = function() {
         if (btnRuta.textContent === 'Salir') {
+            // Limpiar rutas visibles
+            limpiarCapasRutas();
+            rutaVisible = false;
             // Restaurar vista principal
             setBotonRuta(false);
             setBotonPintas(false);
@@ -338,7 +346,19 @@ function setControlesBloqueados(activo) {
 }
 
 function limpiarCapasRutas() {
-    controlesRutasVisibles.forEach((layer) => map.removeLayer(layer));
+    controlesRutasVisibles.forEach((layer) => {
+        try {
+            if (layer && typeof layer.remove === 'function') {
+                layer.remove();
+            } else if (layer && layer._path) {
+                map.removeLayer(layer);
+            } else {
+                map.removeLayer(layer);
+            }
+        } catch (err) {
+            try { map.removeLayer(layer); } catch (e) { /* ignore */ }
+        }
+    });
     controlesRutasVisibles = [];
     marcadoresNumeros.forEach((marcador) => map.removeLayer(marcador));
     marcadoresNumeros = [];
@@ -473,20 +493,30 @@ async function cargarPuntosAprobados() {
 async function cargarRutasAprobadas() {
     if (!SUPABASE_ENABLED) return;
     const { data, error } = await _supabase.from('rutas').select('*');
-    if (error) return;
+    if (error) {
+        console.error('Error al cargar rutas:', error);
+        return;
+    }
+    
+    console.log('Datos de rutas recibidos:', data);
+    
     if (data) {
         const rutasOrdenadas = [];
         const grupos = {};
 
         data.forEach(r => {
             const estado = normalizarEstado(r.estado);
-            const base = obtenerDescripcionBase(r.descripcion);
             const fecha = r.fecha_registro || '';
-            const clave = `${base}|${fecha}`;
+            // Buscar token de grupo en la descripcion (ej: "| Grupo:123456789")
+            const groupMatch = (r.descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+            const groupToken = groupMatch ? groupMatch[1] : null;
+            const base = obtenerDescripcionBase(r.descripcion);
+            const clave = groupToken ? `GROUP_${groupToken}` : `${base}|${fecha}`;
             if (!grupos[clave]) {
                 grupos[clave] = {
                     puntos: [],
-                    estados: new Set()
+                    estados: new Set(),
+                    meta: { base, fecha, groupToken }
                 };
             }
             grupos[clave].puntos.push(r);
@@ -494,22 +524,33 @@ async function cargarRutasAprobadas() {
         });
 
         Object.values(grupos).forEach((grupo) => {
-            if (!grupo.estados.has('aprobado')) {
-                return;
-            }
+            console.log('Procesando grupo:', grupo);
+            
+            // Mostrar todas las rutas (comentado filtro de aprobadas para debug)
+            // if (!grupo.estados.has('aprobado')) {
+            //     return;
+            // }
+            
             grupo.puntos.forEach((r) => {
+                console.log('Procesando registro de ruta:', r);
+                
                 const lat = normalizarNumero(r.latitud);
                 const lng = normalizarNumero(r.longitud);
                 if (lat === null || lng === null) {
+                    console.log('Coordenadas inválidas para ruta:', r);
                     return;
                 }
-                rutasOrdenadas.push({
-                    id: r.id,
-                    lat,
-                    lng,
-                    fecha: r.fecha_registro,
-                    descripcion: r.descripcion
-                });
+                
+                // Simplemente agregar el punto
+                    rutasOrdenadas.push({
+                        id: r.id,
+                        lat,
+                        lng,
+                        fecha: r.fecha_registro,
+                        descripcion: r.descripcion,
+                        foto_url: r.foto_url || null,
+                        nombre_persona: r.nombre_persona || null
+                    });
             });
         });
 
@@ -517,11 +558,24 @@ async function cargarRutasAprobadas() {
         rutasOrdenadas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
         puntosRutaAprobados = rutasOrdenadas;
         puntosSeleccionados = new Set(rutasOrdenadas.map(r => r.id));
+        
+        console.log('Rutas procesadas:', puntosRutaAprobados);
+        console.log('IDs seleccionados:', Array.from(puntosSeleccionados));
+        
         renderListaPuntos();
+        
+        // Las rutas se cargan pero NO se muestran automáticamente
+        // Solo se mostrarán cuando el usuario presione "Rutas", "Mostrar ambos" o "Mostrar ruta"
+        if (puntosRutaAprobados.length > 0) {
+            console.log('Rutas cargadas exitosamente:', puntosRutaAprobados.length, 'puntos');
+        } else {
+            console.log('No hay rutas aprobadas para mostrar');
+        }
     }
 }
 
 // Función para formatear fecha
+
 function formatearFecha(fechaString) {
     if (!fechaString) return 'Sin fecha';
     const fecha = new Date(fechaString + 'T00:00:00');
@@ -619,8 +673,13 @@ function renderListaPuntos() {
     contenedor.innerHTML = '';
     rutaGruposActuales = {};
     puntosRutaAprobados.forEach((p) => {
-        const baseDescripcion = obtenerDescripcionBase(p.descripcion);
-        const clave = `${baseDescripcion}|${p.fecha || ''}`;
+        // Extraer token de grupo si existe
+        const match = (p.descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+        const groupToken = match ? match[1] : null;
+        // Limpiar descripcion para mostrar (remover token de grupo antes de normalizar)
+        const descripcionLimpia = (p.descripcion || '').replace(/\|\s*Grupo\s*:\s*\d+/i, '').trim();
+        const baseDescripcion = obtenerDescripcionBase(descripcionLimpia);
+        const clave = groupToken ? `GROUP_${groupToken}` : `${baseDescripcion}|${p.fecha || ''}`;
         if (!rutaGruposActuales[clave]) {
             rutaGruposActuales[clave] = {
                 descripcion: baseDescripcion || 'Ruta sin descripcion',
@@ -858,24 +917,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     ({ error: insertError } = await _supabase.from(tablaDestino).insert([payload]));
                 } else {
+                    // MODO RUTA: Guardar TODOS los puntos de la ruta con un token de grupo
                     const puntosRuta = obtenerWaypointsTemporal();
-                    const inicioRuta = puntosRuta[0];
-                    const dirInicio = inicioRuta ? await obtenerDireccion(inicioRuta.lat, inicioRuta.lng) : '';
-                    const descripcionFinal = formatearDescripcionRuta(
-                        descripcion,
-                        inicioRuta,
-                        dirInicio
-                    );
-                    const payload = {
-                        ...payloadBase,
-                        latitud: inicioRuta.lat,
-                        longitud: inicioRuta.lng,
-                        descripcion: descripcionFinal
-                    };
-                    if (urlFinal) {
-                        payload.foto_url = urlFinal;
+                    console.log('Puntos de la ruta temporal:', puntosRuta);
+
+                    if (puntosRuta.length < 2) {
+                        cerrarModalExito();
+                        alert('❌ Error: Necesitas al menos 2 puntos para crear una ruta');
+                        return;
                     }
-                    ({ error: insertError } = await _supabase.from(tablaDestino).insert([payload]));
+
+                    const groupToken = Date.now();
+                    console.log('Creando ruta con groupToken (guardando solo inicio):', groupToken);
+
+                    // Guardar en memoria la secuencia completa de puntos marcada por el usuario
+                    rutaReferencias[groupToken] = puntosRuta.slice();
+
+                    // Solo insertar el primer punto en la base de datos (registro principal)
+                    const pt = puntosRuta[0];
+                    const dir = await obtenerDireccion(pt.lat, pt.lng);
+                    const descripcionIndexada = formatearDescripcionRuta(`${descripcion} (1) | Grupo:${groupToken}`, pt, dir);
+                    const payloadP = {
+                        ...payloadBase,
+                        latitud: pt.lat,
+                        longitud: pt.lng,
+                        descripcion: descripcionIndexada
+                    };
+                    if (urlFinal) payloadP.foto_url = urlFinal;
+
+                    console.log('Insertando 1 registro (inicio) en Supabase para la ruta');
+                    ({ error: insertError } = await _supabase.from(tablaDestino).insert([payloadP]));
                 }
 
                 if (!insertError) {
@@ -1011,6 +1082,11 @@ function agregarMarcadorPendiente(latitud, longitud, descripcion, nombre_persona
 
 // Función para dibujar/ocultar la ruta
 function toggleRuta() {
+    console.log('toggleRuta() llamada');
+    console.log('modoAgregarPintas:', modoAgregarPintas);
+    console.log('modoAgregarRuta:', modoAgregarRuta);
+    console.log('puntosRutaAprobados:', puntosRutaAprobados);
+    
     if (modoAgregarPintas) {
         return;
     }
@@ -1019,6 +1095,7 @@ function toggleRuta() {
         return;
     }
     if (!puntosRutaAprobados) {
+        console.log('No hay puntosRutaAprobados');
         return;
     }
 
@@ -1056,7 +1133,7 @@ function toggleRuta() {
         setPanelInfo('Rutas', 'Desmarca las rutas que no quieras incluir.');
         setPanelListaVisible('rutas');
         setBotonPintas(false);
-        setBotonRuta(true);
+        setBotonRuta(true); // Establecer como "Salir"
         mostrarOpcionesRuta(true);
         mostrarOpcionesPintas(false);
         setBotonesPrincipalesVisible(true, false);
@@ -1066,12 +1143,17 @@ function toggleRuta() {
         setBotonAmbosTexto(false);
         setCancelarRutaTopVisible(true, 'Salir');
         actualizarVisibilidadPintas();
+        console.log('Llamando a construirRutaSeleccionada desde toggleRuta');
         construirRutaSeleccionada();
         setBotonAddHabilitado(true);
     }
 }
 
 function toggleAmbos() {
+    console.log('toggleAmbos() llamada');
+    console.log('modoAgregarRuta:', modoAgregarRuta);
+    console.log('modoAgregarPintas:', modoAgregarPintas);
+    
     if (modoAgregarRuta || modoAgregarPintas) {
         return;
     }
@@ -1116,6 +1198,7 @@ function toggleAmbos() {
     setCancelarRutaTopVisible(true, 'Salir');
     mostrarPintasMapa(true);
     renderListaPintas();
+    console.log('Llamando a construirRutaSeleccionada desde toggleAmbos');
     construirRutaSeleccionada();
 }
 
@@ -1275,8 +1358,15 @@ function cancelarAgregarPintas() {
 }
 
 function construirRutaSeleccionada() {
+    console.log('construirRutaSeleccionada llamada');
+    console.log('puntosRutaAprobados:', puntosRutaAprobados);
+    console.log('puntosSeleccionados:', Array.from(puntosSeleccionados));
+    
     const puntos = puntosRutaAprobados.filter(p => puntosSeleccionados.has(p.id));
-    if (puntos.length < 2) {
+    console.log('Puntos filtrados:', puntos);
+    
+    if (puntos.length < 1) {
+        console.log('No hay puntos para crear ruta');
         limpiarCapasRutas();
         return;
     }
@@ -1285,23 +1375,39 @@ function construirRutaSeleccionada() {
 
     const grupos = {};
     puntos.forEach((p) => {
-        const baseDescripcion = obtenerDescripcionBase(p.descripcion);
-        const clave = `${baseDescripcion}|${p.fecha || ''}`;
+        // Detectar token de grupo en la descripcion si existe
+        const match = (p.descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+        const groupToken = match ? match[1] : null;
+        const descripcionLimpia = (p.descripcion || '').replace(/\|\s*Grupo\s*:\s*\d+/i, '').trim();
+        const baseDescripcion = obtenerDescripcionBase(descripcionLimpia);
+        const clave = groupToken ? `GROUP_${groupToken}` : `${baseDescripcion}|${p.fecha || ''}`;
         if (!grupos[clave]) {
             grupos[clave] = [];
         }
         grupos[clave].push(p);
     });
+    
+    console.log('Grupos de rutas creados:', grupos);
 
     Object.values(grupos).forEach((grupo) => {
-        if (grupo.length < 2) {
+        let createdMarkersForGroup = false;
+        // Permitir grupos de 1 o más puntos
+        if (grupo.length < 1) {
+            console.log('Grupo vacío ignorado:', grupo);
             return;
         }
+        console.log('Dibujando grupo de ruta con', grupo.length, 'puntos:', grupo);
+        
         const descripcionRuta = normalizarDescripcionRuta(grupo[0].descripcion);
         const fechaRuta = grupo[0].fecha || '';
+        const fotoUrlRuta = grupo[0].foto_url || null;
+        const autorRuta = grupo[0].nombre_persona || '';
+        const fotoHtml = fotoUrlRuta ? `<img src="${fotoUrlRuta}" width="180px" style="border-radius:8px; margin:8px 0; display:block; margin-left:auto; margin-right:auto;">` : '';
         const popupHtml = `<div style="text-align:center;">
             <b style="color:#e74c3c;">${escapeHtml(descripcionRuta)}</b>
             <br><small style="color:#666; font-weight:bold;">📅 ${formatearFecha(fechaRuta)}</small>
+            <br><small style="color:#999;">Por: ${escapeHtml(autorRuta)}</small>
+            ${fotoHtml}
         </div>`;
 
         grupo.sort((a, b) => {
@@ -1312,45 +1418,226 @@ function construirRutaSeleccionada() {
             return idxA - idxB;
         });
 
-        const puntosLinea = grupo.map((p) => [p.lat, p.lng]);
-        const linea = L.polyline(puntosLinea, {
-            color: '#e74c3c',
-            opacity: 0.85,
-            weight: 6
-        }).addTo(map);
-        linea.bindPopup(popupHtml);
-        controlesRutasVisibles.push(linea);
-        const primero = grupo[0];
-        const ultimo = grupo[grupo.length - 1];
-        const marcadorInicio = L.marker([primero.lat, primero.lng], {
+        // Determinar puntos a usar para la línea: preferir referencias en memoria por grupoToken
+        const tokenMatch = (grupo[0].descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+        const grupoToken = tokenMatch ? tokenMatch[1] : null;
+        let puntosLinea = null;
+        if (grupoToken && rutaReferencias[grupoToken] && rutaReferencias[grupoToken].length >= 2) {
+            puntosLinea = rutaReferencias[grupoToken].map(p => [p.lat, p.lng]);
+        } else if (grupo.length >= 2) {
+            puntosLinea = grupo.map((p) => [p.lat, p.lng]);
+        }
+
+        if (puntosLinea) {
+            if (PREFER_MARKED_PATH) {
+                // Dibujar exactamente el camino marcado por los puntos (polyline)
+                console.log('Dibujando polyline siguiendo los puntos marcados:', puntosLinea.length);
+                const linea = L.polyline(puntosLinea, {
+                    color: '#e74c3c',
+                    opacity: 0.95,
+                    weight: 6
+                }).addTo(map);
+                linea.bindPopup(popupHtml);
+                controlesRutasVisibles.push(linea);
+
+                // Crear únicamente marcadores de Inicio y Fin (no uno por cada punto)
+                const inicio = grupo[0];
+                const fin = grupo[grupo.length - 1];
+                const fotoInicio = inicio.foto_url || null;
+                const autorInicio = inicio.nombre_persona || '';
+                const fotoHtmlInicio = fotoInicio ? `<img src="${fotoInicio}" width="160px" style="border-radius:8px; margin:6px 0; display:block; margin-left:auto; margin-right:auto;">` : '';
+                const popupInicio = `<div style="text-align:center;">
+                    <b style="color:#e74c3c;">${escapeHtml(descripcionRuta)} (Inicio)</b>
+                    <br><small style="color:#666; font-weight:bold;">📅 ${formatearFecha(fechaRuta)}</small>
+                    <br><small style="color:#999;">Por: ${escapeHtml(autorInicio)}</small>
+                    ${fotoHtmlInicio}
+                </div>`;
+                const marcadorInicio = L.marker([inicio.lat, inicio.lng], {
+                    icon: L.divIcon({
+                        className: 'numero-ruta',
+                        html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.3); font-size: 16px;">1</div>`,
+                        iconSize: [35,35]
+                    }),
+                    draggable: false
+                }).addTo(map);
+                marcadorInicio.bindPopup(popupInicio);
+                marcadoresNumeros.push(marcadorInicio);
+
+                if (fin !== inicio) {
+                    const fotoFin = fin.foto_url || null;
+                    const autorFin = fin.nombre_persona || '';
+                    const fotoHtmlFin = fotoFin ? `<img src="${fotoFin}" width="160px" style="border-radius:8px; margin:6px 0; display:block; margin-left:auto; margin-right:auto;">` : '';
+                    const popupFin = `<div style="text-align:center;">
+                        <b style="color:#e74c3c;">${escapeHtml(descripcionRuta)} (Fin)</b>
+                        <br><small style="color:#666; font-weight:bold;">📅 ${formatearFecha(fechaRuta)}</small>
+                        <br><small style="color:#999;">Por: ${escapeHtml(autorFin)}</small>
+                        ${fotoHtmlFin}
+                    </div>`;
+                    const marcadorFin = L.marker([fin.lat, fin.lng], {
+                        icon: L.divIcon({
+                            className: 'numero-ruta',
+                            html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.3); font-size: 16px;">2</div>`,
+                            iconSize: [35,35]
+                        }),
+                        draggable: false
+                    }).addTo(map);
+                    marcadorFin.bindPopup(popupFin);
+                    marcadoresNumeros.push(marcadorFin);
+                }
+                createdMarkersForGroup = true;
+            } else {
+                // Intentar crear ruta con LRM para seguir vías
+                const waypoints = grupo.map((p) => L.latLng(p.lat, p.lng));
+                console.log('Intentando crear ruta con', waypoints.length, 'waypoints (LRM)');
+                if (window.L && L.Routing && typeof L.Routing.control === 'function') {
+                    try {
+                        const routingControl = L.Routing.control({
+                            waypoints: waypoints,
+                            show: false,
+                            addWaypoints: false,
+                            routeWhileDragging: false,
+                            collapsible: false,
+                            createMarker: function(i, wp, n) {
+                                const marker = L.marker(wp.latLng, {
+                                    icon: L.divIcon({
+                                        className: 'numero-ruta',
+                                        html: `<div style=\"background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); font-size: 16px;\">${i+1}</div>`,
+                                        iconSize: [35,35]
+                                    })
+                                });
+                                marker.bindPopup(popupHtml);
+                                marcadoresNumeros.push(marker);
+                                return marker;
+                            }
+                        }).addTo(map);
+                        controlesRutasVisibles.push(routingControl);
+                    } catch (err) {
+                        console.warn('LRM fallo, usando polyline como fallback:', err);
+                        const linea = L.polyline(puntosLinea, {
+                            color: '#e74c3c',
+                            opacity: 0.85,
+                            weight: 6
+                        }).addTo(map);
+                        linea.bindPopup(popupHtml);
+                        controlesRutasVisibles.push(linea);
+                    }
+                } else {
+                    const linea = L.polyline(puntosLinea, {
+                        color: '#e74c3c',
+                        opacity: 0.85,
+                        weight: 6
+                    }).addTo(map);
+                    linea.bindPopup(popupHtml);
+                    controlesRutasVisibles.push(linea);
+                }
+            }
+        }
+        
+        // Determinar coordenadas reales de inicio/fin: si existen referencias en memoria, úsalas
+        const tokenMatch2 = (grupo[0].descripcion || '').match(/\|\s*Grupo\s*:\s*(\d+)/i);
+        const grupoToken2 = tokenMatch2 ? tokenMatch2[1] : null;
+        let primero, ultimo;
+        if (grupoToken2 && rutaReferencias[grupoToken2] && rutaReferencias[grupoToken2].length >= 2) {
+            const ref = rutaReferencias[grupoToken2];
+            const primerRef = ref[0];
+            const ultimoRef = ref[ref.length - 1];
+            primero = {
+                lat: primerRef.lat,
+                lng: primerRef.lng,
+                foto_url: grupo[0].foto_url || null,
+                nombre_persona: grupo[0].nombre_persona || ''
+            };
+            ultimo = {
+                lat: ultimoRef.lat,
+                lng: ultimoRef.lng,
+                foto_url: grupo[grupo.length - 1] ? (grupo[grupo.length - 1].foto_url || grupo[0].foto_url) : (grupo[0].foto_url || null),
+                nombre_persona: grupo[0].nombre_persona || ''
+            };
+        } else {
+            primero = grupo[0];
+            ultimo = grupo[grupo.length - 1];
+        }
+        
+        if (!createdMarkersForGroup) {
+            const marcadorInicio = L.marker([primero.lat, primero.lng], {
             icon: L.divIcon({
                 className: 'numero-ruta',
                 html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); font-size: 16px;">1</div>`,
                 iconSize: [35, 35]
             }),
             draggable: false
-        }).addTo(map);
-        marcadorInicio.bindPopup(popupHtml);
-        marcadoresNumeros.push(marcadorInicio);
-
-        if (ultimo !== primero) {
-            const marcadorFin = L.marker([ultimo.lat, ultimo.lng], {
-                icon: L.divIcon({
-                    className: 'numero-ruta',
-                    html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); font-size: 16px;">2</div>`,
-                    iconSize: [35, 35]
-                }),
-                draggable: false
             }).addTo(map);
-            marcadorFin.bindPopup(popupHtml);
-            marcadoresNumeros.push(marcadorFin);
+            marcadorInicio.bindPopup(popupHtml);
+            marcadoresNumeros.push(marcadorInicio);
+
+            if (ultimo !== primero) {
+                const marcadorFin = L.marker([ultimo.lat, ultimo.lng], {
+                    icon: L.divIcon({
+                        className: 'numero-ruta',
+                        html: `<div style="background: #e74c3c; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); font-size: 16px;">2</div>`,
+                        iconSize: [35, 35]
+                    }),
+                    draggable: false
+                }).addTo(map);
+                marcadorFin.bindPopup(popupHtml);
+                marcadoresNumeros.push(marcadorFin);
+            }
         }
     });
 
-    rutaVisible = controlesRutasVisibles.length > 0;
+    console.log('Controles de rutas visibles:', controlesRutasVisibles.length);
+    console.log('Marcadores numéricos:', marcadoresNumeros.length);
+    
+    // Hay rutas visibles si hay líneas O marcadores
+    rutaVisible = controlesRutasVisibles.length > 0 || marcadoresNumeros.length > 0;
+    console.log('rutaVisible establecida en:', rutaVisible);
+
+    // Intentar centrar/encuadrar el mapa en las rutas y/o marcadores añadidos
+    try {
+        const puntosBounds = [];
+        // Añadir puntos de las líneas
+        controlesRutasVisibles.forEach((poly) => {
+            if (poly && typeof poly.getLatLngs === 'function') {
+                const latlngs = poly.getLatLngs();
+                // Si la polilínea es un arreglo de arreglos (multi), aplanar
+                if (Array.isArray(latlngs[0])) {
+                    latlngs.forEach(arr => arr.forEach(ll => puntosBounds.push([ll.lat, ll.lng])));
+                } else {
+                    latlngs.forEach(ll => puntosBounds.push([ll.lat, ll.lng]));
+                }
+            }
+        });
+        // Añadir puntos de marcadores
+        marcadoresNumeros.forEach((m) => {
+            if (m && typeof m.getLatLng === 'function') {
+                const ll = m.getLatLng();
+                puntosBounds.push([ll.lat, ll.lng]);
+            }
+        });
+
+        if (puntosBounds.length > 0) {
+            const bounds = L.latLngBounds(puntosBounds);
+            console.log('Ajustando vista a bounds:', bounds.toBBoxString());
+            // No cambiar la cámara si estamos mostrando ambos (modo compacto)
+            if (panelModo !== 'ambos') {
+                map.fitBounds(bounds.pad ? bounds.pad(0.15) : bounds, { padding: [40, 40] });
+            } else {
+                console.log('Omitiendo map.fitBounds porque panelModo === "ambos"');
+            }
+        } else {
+            console.log('No hay coordenadas válidas para centrar el mapa.');
+        }
+    } catch (err) {
+        console.warn('Error intentando centrar mapa en rutas:', err);
+    }
+    
+    // Actualizar el botón solo si NO estamos en modo rutas (porque toggleRuta ya lo configuró)
     if (panelModo === 'ambos') {
         setBotonRuta(false);
         setBotonPintas(false);
+    } else if (panelModo === 'rutas') {
+        // Mantener el botón en "Salir" cuando estamos viendo rutas
+        setBotonRuta(true);
     } else {
         setBotonRuta(rutaVisible);
     }
@@ -1697,4 +1984,3 @@ function mostrarRutasDesdePintas() {
     setBotonMostrarRutas(true);
     construirRutaSeleccionada();
 }
-
